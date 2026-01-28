@@ -1,12 +1,11 @@
-export default async (req, context) => {
-  const url = new URL(req.url);
-  const schoolCode = url.searchParams.get('code');
+exports.handler = async (event, context) => {
+  const schoolCode = event.queryStringParameters?.code;
   
   if (!schoolCode) {
-    return new Response(JSON.stringify({ success: false, error: 'Missing school code' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ success: false, error: 'Missing school code' })
+    };
   }
   
   const API_KEY = '2773b688e2d74b028faa01081f8c407d';
@@ -18,23 +17,25 @@ export default async (req, context) => {
     
     if (data.schoolInfo && data.schoolInfo[1]?.row?.[0]) {
       const school = data.schoolInfo[1].row[0];
-      return new Response(JSON.stringify({
-        success: true,
-        schoolName: school.SCHUL_NM,
-        address: school.ORG_RDNMA,
-        schoolType: school.SCHUL_KND_SC_NM
-      }), {
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          success: true,
+          schoolName: school.SCHUL_NM,
+          address: school.ORG_RDNMA,
+          schoolType: school.SCHUL_KND_SC_NM
+        })
+      };
     }
     
-    return new Response(JSON.stringify({ success: false }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ success: false })
+    };
   } catch (error) {
-    return new Response(JSON.stringify({ success: false, error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ success: false, error: error.message })
+    };
   }
 };
