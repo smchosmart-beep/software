@@ -478,12 +478,26 @@ const Alert = ({ type = 'success', message, onClose }) => {
 // 페이지: 메인 (학교코드 입력 + 역할 선택)
 // ============================================
 
-// 나이스 API로 학교 정보 조회 (Netlify Function 경유)
+// 나이스 API로 학교 정보 조회 (CORS Proxy 사용)
 const fetchSchoolInfo = async (schoolCode) => {
+  const API_KEY = '2773b688e2d74b028faa01081f8c407d';
+  const apiUrl = `https://open.neis.go.kr/hub/schoolInfo?KEY=${API_KEY}&Type=json&SD_SCHUL_CODE=${schoolCode}`;
+  const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
+  
   try {
-    const response = await fetch(`/.netlify/functions/school-info?code=${schoolCode}`);
+    const response = await fetch(proxyUrl);
     const data = await response.json();
-    return data;
+    
+    if (data.schoolInfo && data.schoolInfo[1]?.row?.[0]) {
+      const school = data.schoolInfo[1].row[0];
+      return {
+        success: true,
+        schoolName: school.SCHUL_NM,
+        address: school.ORG_RDNMA,
+        schoolType: school.SCHUL_KND_SC_NM
+      };
+    }
+    return { success: false };
   } catch (error) {
     console.error('학교 정보 조회 오류:', error);
     return { success: false };
