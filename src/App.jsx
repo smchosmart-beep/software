@@ -689,7 +689,15 @@ const MainPage = ({ onNavigate }) => {
             <School className="w-8 h-8 text-indigo-600" />
           </div>
           <h1 className="text-2xl font-bold text-slate-900 mb-2">학습지원 소프트웨어</h1>
-          <p className="text-slate-600">수요조사 시스템</p>
+          <p className="text-slate-600 mb-4">수요조사 및 심의자료 생성 시스템</p>
+          <a
+            href={`/${encodeURIComponent('2026학년도 학습지원 소프트웨어 교육자료 선정 계획(안).hwp')}`}
+            download="2026학년도 학습지원 소프트웨어 교육자료 선정 계획(안).hwp"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-lg border border-slate-300 hover:bg-slate-200 hover:border-slate-400 transition-colors text-sm font-medium"
+          >
+            <Download className="w-4 h-4 shrink-0" />
+            심의자료 서식
+          </a>
         </div>
         
         {error && (
