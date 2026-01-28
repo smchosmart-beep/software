@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  School,
   Users,
   Shield,
   Plus,
@@ -685,9 +684,7 @@ const MainPage = ({ onNavigate }) => {
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <School className="w-8 h-8 text-indigo-600" />
-          </div>
+          <img src="/logo.png" alt="로고" className="w-16 h-16 rounded-2xl mx-auto mb-4 object-contain" />
           <h1 className="text-2xl font-bold text-slate-900 mb-2">학습지원 소프트웨어</h1>
           <p className="text-slate-600 mb-4">수요조사 및 심의자료 생성 시스템</p>
           <a
