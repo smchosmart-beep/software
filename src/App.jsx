@@ -478,29 +478,94 @@ const Alert = ({ type = 'success', message, onClose }) => {
 // 페이지: 메인 (학교코드 입력 + 역할 선택)
 // ============================================
 
+// NEIS API 학교코드 형식: SD_SCHUL_CODE=7자리 숫자(예: 7010911), ATPT_OFCDC_SC_CODE=3자리(예: B10)
+// 참고: https://github.com/my-school-info/neis-api
+const NEIS_API_KEY = '2773b688e2d74b028faa01081f8c407d';
+const NEIS_BASE = 'https://open.neis.go.kr/hub/schoolInfo';
+
+const buildSchoolInfoUrl = (params) => {
+  const search = new URLSearchParams({
+    KEY: NEIS_API_KEY,
+    Type: 'json',
+    pIndex: '1',
+    pSize: '100',
+    ...params
+  });
+  return `${NEIS_BASE}?${search.toString()}`;
+};
+
+// 입력된 코드를 시도교육청코드(3자) + 표준학교코드(7자)로 파싱
+const parseSchoolCodeInput = (input) => {
+  const raw = String(input).trim().toUpperCase();
+  if (/^[0-9]{7}$/.test(raw)) {
+    return { sdSchulCode: raw }; // 7자리만: 표준학교코드만 사용
+  }
+  if (/^[A-Z][0-9]{9}$/.test(raw)) {
+    return { atptOfcdcScCode: raw.slice(0, 3), sdSchulCode: raw.slice(3, 10) };
+  }
+  return null;
+};
+
 // 나이스 API로 학교 정보 조회 (CORS Proxy 사용)
-const fetchSchoolInfo = async (schoolCode) => {
-  const API_KEY = '2773b688e2d74b028faa01081f8c407d';
-  const apiUrl = `https://open.neis.go.kr/hub/schoolInfo?KEY=${API_KEY}&Type=json&SD_SCHUL_CODE=${schoolCode}`;
+const fetchSchoolInfo = async (schoolCodeInput) => {
+  const parsed = parseSchoolCodeInput(schoolCodeInput);
+  if (!parsed) return { success: false };
+
+  const params = { SD_SCHUL_CODE: parsed.sdSchulCode };
+  if (parsed.atptOfcdcScCode) params.ATPT_OFCDC_SC_CODE = parsed.atptOfcdcScCode;
+
+  const apiUrl = buildSchoolInfoUrl(params);
   const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
-  
+
   try {
     const response = await fetch(proxyUrl);
     const data = await response.json();
-    
-    if (data.schoolInfo && data.schoolInfo[1]?.row?.[0]) {
-      const school = data.schoolInfo[1].row[0];
-      return {
-        success: true,
-        schoolName: school.SCHUL_NM,
-        address: school.ORG_RDNMA,
-        schoolType: school.SCHUL_KND_SC_NM
-      };
+
+    const head = data.schoolInfo?.[0]?.head;
+    const result = Array.isArray(head) ? head[0] : head;
+    if (result?.RESULT?.CODE && result.RESULT.CODE !== 'INFO-000') {
+      console.warn('NEIS API 결과:', result.RESULT.CODE, result.RESULT.MESSAGE);
+      return { success: false };
     }
-    return { success: false };
+
+    const row = data.schoolInfo?.[1]?.row;
+    const list = Array.isArray(row) ? row : row ? [row] : [];
+    const school = list[0];
+    if (!school) return { success: false };
+
+    return {
+      success: true,
+      schoolName: school.SCHUL_NM,
+      address: school.ORG_RDNMA,
+      schoolType: school.SCHUL_KND_SC_NM,
+      sdSchulCode: school.SD_SCHUL_CODE,
+      atptOfcdcScCode: school.ATPT_OFCDC_SC_CODE
+    };
   } catch (error) {
     console.error('학교 정보 조회 오류:', error);
     return { success: false };
+  }
+};
+
+// 학교명으로 검색해 API가 반환하는 학교코드 확인 (형식 검증용)
+const fetchSchoolListByName = async (schoolName) => {
+  const apiUrl = buildSchoolInfoUrl({ SCHUL_NM: schoolName });
+  const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    const row = data.schoolInfo?.[1]?.row;
+    const list = Array.isArray(row) ? row : row ? [row] : [];
+    return list.map((s) => ({
+      name: s.SCHUL_NM,
+      sdSchulCode: s.SD_SCHUL_CODE,
+      atptOfcdcScCode: s.ATPT_OFCDC_SC_CODE,
+      fullCode: `${s.ATPT_OFCDC_SC_CODE}${s.SD_SCHUL_CODE}`,
+      address: s.ORG_RDNMA
+    }));
+  } catch (e) {
+    console.error('학교명 검색 오류:', e);
+    return [];
   }
 };
 
@@ -512,6 +577,10 @@ const MainPage = ({ onNavigate }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [role, setRole] = useState('');
   const [error, setError] = useState('');
+  const [codeSearchName, setCodeSearchName] = useState('');
+  const [codeSearchResults, setCodeSearchResults] = useState([]);
+  const [codeSearchLoading, setCodeSearchLoading] = useState(false);
+  const [codeSearchDone, setCodeSearchDone] = useState(false);
   
   // 학교 정보 검증
   const handleVerify = async () => {
@@ -524,17 +593,17 @@ const MainPage = ({ onNavigate }) => {
       return;
     }
     
-    // NEIS 학교코드 형식 검증
-    const neisCodePattern = /^[A-Z][0-9]{9}$/i;
-    if (!neisCodePattern.test(schoolCode.trim())) {
-      setError('올바른 NEIS 학교코드 형식이 아닙니다. (예: B100001734)');
+    // NEIS 학교코드 형식: 7자리 숫자(표준학교코드) 또는 3자리+7자리(시도교육청코드+표준학교코드)
+    const parsed = parseSchoolCodeInput(schoolCode);
+    if (!parsed) {
+      setError('올바른 NEIS 학교코드 형식이 아닙니다. (7자리: 7010911 또는 10자리: B107010911)');
       return;
     }
     
     setIsLoading(true);
     setError('');
     
-    const info = await fetchSchoolInfo(schoolCode.toUpperCase());
+    const info = await fetchSchoolInfo(schoolCode.trim());
     
     setIsLoading(false);
     
@@ -590,7 +659,28 @@ const MainPage = ({ onNavigate }) => {
     setVerifiedInfo(null);
     setError('');
   };
-  
+
+  const handleSearchCodeByName = async () => {
+    const name = codeSearchName.trim();
+    if (!name) return;
+    setCodeSearchLoading(true);
+    setCodeSearchResults([]);
+    setCodeSearchDone(false);
+    try {
+      const list = await fetchSchoolListByName(name);
+      setCodeSearchResults(list);
+      setCodeSearchDone(true);
+    } finally {
+      setCodeSearchLoading(false);
+    }
+  };
+
+  const applyCodeFromSearch = (fullCode) => {
+    setSchoolCode(fullCode);
+    setCodeSearchResults([]);
+    setCodeSearchName('');
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md p-8">
@@ -631,14 +721,57 @@ const MainPage = ({ onNavigate }) => {
               type="text"
               value={schoolCode}
               onChange={(e) => handleSchoolCodeChange(e.target.value)}
-              placeholder="예: B100001734"
+              placeholder="예: 7010911 또는 B107010911"
               maxLength={10}
               disabled={isVerified}
               className={`w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 font-mono ${isVerified ? 'bg-slate-100' : ''}`}
             />
             <p className="mt-1.5 text-xs text-slate-500">
-              NEIS 학교코드는 학교정보 &gt; 기본정보에서 확인할 수 있습니다.
+              표준학교코드 7자리(7010911) 또는 시도교육청코드+표준학교코드 10자리(B107010911). 아래에서 학교명으로 코드를 조회할 수 있습니다.
             </p>
+            <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+              <p className="text-xs font-medium text-slate-600 mb-2">학교명으로 NEIS 코드 조회</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={codeSearchName}
+                  onChange={(e) => setCodeSearchName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearchCodeByName()}
+                  placeholder="예: 상명초등학교"
+                  className="flex-1 px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+                <button
+                  type="button"
+                  onClick={handleSearchCodeByName}
+                  disabled={codeSearchLoading}
+                  className="px-3 py-1.5 text-sm bg-slate-200 text-slate-700 rounded hover:bg-slate-300 disabled:opacity-50"
+                >
+                  {codeSearchLoading ? '조회 중...' : '조회'}
+                </button>
+              </div>
+              {codeSearchResults.length > 0 && (
+                <ul className="mt-2 space-y-1.5 max-h-32 overflow-y-auto">
+                  {codeSearchResults.map((s, i) => (
+                    <li key={i} className="text-xs flex items-center justify-between gap-2 bg-white p-2 rounded border border-slate-200">
+                      <span className="text-slate-700 truncate">{s.name}</span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <code className="text-indigo-600 font-mono">{s.fullCode}</code>
+                        <button
+                          type="button"
+                          onClick={() => applyCodeFromSearch(s.fullCode)}
+                          className="text-indigo-600 hover:underline"
+                        >
+                          사용
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {codeSearchDone && codeSearchResults.length === 0 && codeSearchName.trim() && (
+                <p className="mt-2 text-xs text-slate-500">검색 결과가 없습니다.</p>
+              )}
+            </div>
           </div>
           
           {!isVerified ? (
