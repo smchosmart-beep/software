@@ -1222,6 +1222,21 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
   // 선정이유 더보기 상태
   const [expandedReasons, setExpandedReasons] = useState({});
   
+  // [서식2] 에듀집 등록 체크리스트 안내 모달
+  const [showChecklistGuideModal, setShowChecklistGuideModal] = useState(false);
+  const [checklistStorageCount, setChecklistStorageCount] = useState(null); // 모달에서 표시할 스토리지 체크리스트 개수
+  
+  // 모달 열릴 때 스토리지 체크리스트 개수 조회
+  useEffect(() => {
+    if (!showChecklistGuideModal) return;
+    setChecklistStorageCount(null);
+    const fetchCount = async () => {
+      const { data, error } = await supabase.storage.from(CHECKLIST_BUCKET).list('', { limit: 1000 });
+      if (!error && Array.isArray(data)) setChecklistStorageCount(data.length);
+    };
+    fetchCount();
+  }, [showChecklistGuideModal]);
+  
   // 데이터 로드
   useEffect(() => {
     const loadData = async () => {
@@ -1552,11 +1567,9 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
               <div className="flex items-center gap-2">
                 <Button
                   variant="primary"
-                  icon={Download}
-                  onClick={handleDownloadChecklists}
-                  disabled={!getUniqueProducts().some(p => form3Data[p.productName]?.reason && p.eduzipData?.seqNo != null)}
+                  onClick={() => setShowChecklistGuideModal(true)}
                 >
-                  체크리스트 일괄 다운로드
+                  에듀집 등록 체크리스트
                 </Button>
                 <Button variant="secondary" icon={Download} disabled>
                   [서식2] 엑셀 다운로드
@@ -2041,24 +2054,22 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
                 <p className="text-sm text-slate-500 mt-1">체크리스트는 웹하드에서 확인·관리합니다.</p>
               </div>
               <div className="p-8 text-center space-y-4">
-                <p className="text-slate-600">체크리스트를 보려면 웹하드를 열거나, 선정이유를 작성한 제품의 체크리스트를 일괄 다운로드할 수 있습니다.</p>
+                <p className="text-slate-600">에듀집 등록 제품은 [서식3]에서 일괄 다운로드할 수 있고, 미등록 제품 체크리스트는 웹하드에서 확인할 수 있습니다.</p>
                 <div className="flex flex-wrap items-center justify-center gap-3">
                   <a
                     href={FORM2_WEBHARD_URL}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-5 py-3 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                    className="inline-flex items-center gap-2 px-5 py-3 bg-slate-600 text-white text-sm font-medium rounded-lg hover:bg-slate-700 transition-colors"
                   >
-                    <ChevronRight className="w-4 h-4" />
-                    웹하드 열기
+                    <Download className="w-4 h-4" />
+                    에듀집 미등록 체크리스트
                   </a>
                   <Button
                     variant="primary"
-                    icon={Download}
-                    onClick={handleDownloadChecklists}
-                    disabled={!getUniqueProducts().some(p => form3Data[p.productName]?.reason && p.eduzipData?.seqNo != null)}
+                    onClick={() => setShowChecklistGuideModal(true)}
                   >
-                    체크리스트 일괄 다운로드
+                    에듀집 등록 체크리스트
                   </Button>
                 </div>
               </div>
@@ -2220,6 +2231,33 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
           </>
         )}
       </main>
+
+      {/* [서식2] 에듀집 등록 체크리스트 안내 모달 */}
+      {showChecklistGuideModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <p className="text-slate-700 text-center leading-relaxed mb-4">
+              [서식3] 의견서 작성 을 하시면 수요조사 목록에 있는 제품의 체크리스트를 일괄다운로드 하실 수 있습니다
+            </p>
+            <p className="text-slate-600 text-center text-sm mb-6">
+              {checklistStorageCount === null
+                ? '스토리지 체크리스트 개수 불러오는 중…'
+                : `총 ${checklistStorageCount}개의 체크리스트가 스토리지에 저장되어 있습니다.`}
+            </p>
+            <div className="flex justify-center">
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setShowChecklistGuideModal(false);
+                  setActiveTab('form3');
+                }}
+              >
+                확인
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
