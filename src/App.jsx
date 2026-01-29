@@ -567,8 +567,6 @@ const fetchSchoolListByName = async (schoolName) => {
 const MainPage = ({ onNavigate }) => {
   const [schoolName, setSchoolName] = useState('');
   const [schoolCode, setSchoolCode] = useState('');
-  const [isVerified, setIsVerified] = useState(false);
-  const [verifiedInfo, setVerifiedInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [role, setRole] = useState('');
   const [error, setError] = useState('');
@@ -577,8 +575,8 @@ const MainPage = ({ onNavigate }) => {
   const [codeSearchLoading, setCodeSearchLoading] = useState(false);
   const [codeSearchDone, setCodeSearchDone] = useState(false);
   
-  // 학교 정보 검증
-  const handleVerify = async () => {
+  // 입장하기 (검증 + 페이지 이동)
+  const handleSubmit = async () => {
     if (!schoolName.trim()) {
       setError('학교명을 입력해주세요.');
       return;
@@ -587,11 +585,15 @@ const MainPage = ({ onNavigate }) => {
       setError('NEIS 학교코드를 입력해주세요.');
       return;
     }
+    if (!role) {
+      setError('역할을 선택해주세요.');
+      return;
+    }
     
-    // NEIS 학교코드 형식: 7자리 숫자(표준학교코드) 또는 3자리+7자리(시도교육청코드+표준학교코드)
+    // NEIS 학교코드 형식 검사
     const parsed = parseSchoolCodeInput(schoolCode);
     if (!parsed) {
-      setError('올바른 NEIS 학교코드 형식이 아닙니다. (7자리: 7010911 또는 10자리: B107010911)');
+      setError('올바른 NEIS 학교코드 형식이 아닙니다.');
       return;
     }
     
@@ -604,7 +606,6 @@ const MainPage = ({ onNavigate }) => {
     
     if (!info.success) {
       setError('학교 정보를 찾을 수 없습니다. 학교코드를 확인해주세요.');
-      setIsVerified(false);
       return;
     }
     
@@ -614,45 +615,15 @@ const MainPage = ({ onNavigate }) => {
     
     if (!apiName.includes(inputName) && !inputName.includes(apiName)) {
       setError(`입력하신 학교명과 일치하지 않습니다. (실제: ${info.schoolName})`);
-      setIsVerified(false);
       return;
     }
     
-    // 검증 성공
-    setIsVerified(true);
-    setVerifiedInfo(info);
-  };
-  
-  const handleSubmit = () => {
-    if (!isVerified) {
-      setError('먼저 학교 정보를 확인해주세요.');
-      return;
-    }
-    if (!role) {
-      setError('역할을 선택해주세요.');
-      return;
-    }
-    
+    // 검증 성공 → 페이지 이동
     if (role === 'teacher') {
-      onNavigate('teacher', schoolCode.toUpperCase(), verifiedInfo.schoolName);
+      onNavigate('teacher', schoolCode.toUpperCase(), info.schoolName);
     } else if (role === 'manager') {
-      onNavigate('manager', schoolCode.toUpperCase(), verifiedInfo.schoolName);
+      onNavigate('manager', schoolCode.toUpperCase(), info.schoolName);
     }
-  };
-  
-  // 입력값 변경 시 검증 상태 초기화
-  const handleSchoolNameChange = (value) => {
-    setSchoolName(value);
-    setIsVerified(false);
-    setVerifiedInfo(null);
-    setError('');
-  };
-  
-  const handleSchoolCodeChange = (value) => {
-    setSchoolCode(value.toUpperCase());
-    setIsVerified(false);
-    setVerifiedInfo(null);
-    setError('');
   };
 
   const handleSearchCodeByName = async () => {
@@ -711,13 +682,12 @@ const MainPage = ({ onNavigate }) => {
                 onChange={(e) => setCodeSearchName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearchCodeByName()}
                 placeholder="학교명 입력 (예: 상명초등학교)"
-                disabled={isVerified}
-                className="flex-1 px-3 py-2 text-sm border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100"
+                className="flex-1 px-3 py-2 text-sm border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               <button
                 type="button"
                 onClick={handleSearchCodeByName}
-                disabled={codeSearchLoading || isVerified}
+                disabled={codeSearchLoading}
                 className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium"
               >
                 {codeSearchLoading ? '조회 중...' : '조회'}
@@ -755,10 +725,9 @@ const MainPage = ({ onNavigate }) => {
             <input
               type="text"
               value={schoolName}
-              onChange={(e) => handleSchoolNameChange(e.target.value)}
+              onChange={(e) => setSchoolName(e.target.value)}
               placeholder="위에서 학교를 검색하세요"
-              disabled={isVerified}
-              className={`w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 ${isVerified ? 'bg-slate-100' : ''}`}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
             />
           </div>
           
@@ -770,45 +739,12 @@ const MainPage = ({ onNavigate }) => {
             <input
               type="text"
               value={schoolCode}
-              onChange={(e) => handleSchoolCodeChange(e.target.value)}
+              onChange={(e) => setSchoolCode(e.target.value.toUpperCase())}
               placeholder="위에서 학교를 검색하세요"
               maxLength={10}
-              disabled={isVerified}
-              className={`w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 font-mono ${isVerified ? 'bg-slate-100' : ''}`}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 font-mono"
             />
           </div>
-          
-          {/* 4. 학교 정보 확인 버튼 */}
-          {!isVerified ? (
-            <Button
-              variant="secondary"
-              onClick={handleVerify}
-              disabled={isLoading || !schoolName || !schoolCode}
-              className="w-full"
-            >
-              {isLoading ? '확인 중...' : '학교 정보 확인'}
-            </Button>
-          ) : (
-            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-green-800">{verifiedInfo.schoolName}</p>
-                  <p className="text-xs text-green-600 mt-0.5">{verifiedInfo.schoolType} · {verifiedInfo.address}</p>
-                </div>
-                <button
-                  onClick={() => {
-                    setIsVerified(false);
-                    setVerifiedInfo(null);
-                    setSchoolName('');
-                    setSchoolCode('');
-                  }}
-                  className="text-xs text-green-700 hover:text-green-900 underline"
-                >
-                  다시 입력
-                </button>
-              </div>
-            </div>
-          )}
           
           {/* 5. 역할 선택 */}
           <div>
@@ -860,15 +796,16 @@ const MainPage = ({ onNavigate }) => {
             </div>
           </div>
           
-          {/* 6. 입장하기 버튼 */}
+          {/* 4. 입장하기 버튼 */}
           <Button
             variant="primary"
             size="lg"
             onClick={handleSubmit}
+            disabled={isLoading}
             className="w-full mt-6"
             icon={ChevronRight}
           >
-            입장하기
+            {isLoading ? '확인 중...' : '입장하기'}
           </Button>
         </div>
       </Card>
@@ -1214,6 +1151,20 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
   const [form3Data, setForm3Data] = useState({}); // { productName: { reason: '', selectedReasonId: null } }
   const [reasonsCache, setReasonsCache] = useState({}); // { productName: [reasons] }
   
+  // 수요조사 추가 관련 상태
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addFormData, setAddFormData] = useState({
+    teacherName: '',
+    subject: '',
+    productName: '',
+    purpose: '',
+    hasPersonalInfo: '',
+    isInEduzip: false,
+  });
+  const [productSearch, setProductSearch] = useState('');
+  const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const [filteredProducts, setFilteredProducts] = useState([]);
+  
   // 데이터 로드
   useEffect(() => {
     const loadData = async () => {
@@ -1225,6 +1176,84 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
     };
     loadData();
   }, [schoolCode]);
+  
+  // 제품 검색 필터링 (추가 폼용)
+  useEffect(() => {
+    if (productSearch.trim()) {
+      const filtered = eduzipProducts.filter(p => 
+        p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+        p.provider.toLowerCase().includes(productSearch.toLowerCase())
+      );
+      setFilteredProducts(filtered);
+    } else {
+      setFilteredProducts([]);
+    }
+  }, [productSearch, eduzipProducts]);
+  
+  // 수요조사 추가 - 제품 선택 핸들러
+  const handleAddProductSelect = (product) => {
+    setAddFormData(prev => ({ 
+      ...prev, 
+      productName: product.name,
+      isInEduzip: true 
+    }));
+    setProductSearch(product.name);
+    setShowProductDropdown(false);
+  };
+  
+  // 수요조사 추가 - 제품명 직접 입력 핸들러
+  const handleAddProductInputChange = (value) => {
+    setProductSearch(value);
+    setShowProductDropdown(true);
+    
+    const isInList = eduzipProducts.some(p => 
+      p.name.toLowerCase() === value.toLowerCase()
+    );
+    
+    setAddFormData(prev => ({ 
+      ...prev, 
+      productName: value,
+      isInEduzip: isInList 
+    }));
+  };
+  
+  // 수요조사 추가 - 제출 핸들러
+  const handleAddSubmit = async () => {
+    if (!addFormData.teacherName || !addFormData.subject || !addFormData.productName || !addFormData.purpose || !addFormData.hasPersonalInfo) {
+      setAlert({ type: 'error', message: '모든 필수 항목을 입력해주세요.' });
+      return;
+    }
+    
+    const newSubmission = {
+      schoolCode,
+      teacherName: addFormData.teacherName,
+      subject: addFormData.subject,
+      productName: addFormData.productName,
+      purpose: addFormData.purpose,
+      hasPersonalInfo: addFormData.hasPersonalInfo === 'yes',
+      isInEduzip: addFormData.isInEduzip,
+      createdAt: new Date().toISOString().split('T')[0],
+    };
+    
+    const result = await submitSurvey(newSubmission);
+    
+    if (result.success) {
+      setSurveys(prev => [{ ...newSubmission, id: result.id }, ...prev]);
+      setAddFormData({
+        teacherName: '',
+        subject: '',
+        productName: '',
+        purpose: '',
+        hasPersonalInfo: '',
+        isInEduzip: false,
+      });
+      setProductSearch('');
+      setShowAddForm(false);
+      setAlert({ type: 'success', message: '수요조사가 추가되었습니다.' });
+    } else {
+      setAlert({ type: 'error', message: '추가 중 오류가 발생했습니다.' });
+    }
+  };
   
   // 제품별 선정이유 로드
   const loadReasons = async (productName) => {
@@ -1500,9 +1529,147 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
             
             {/* 수요조사 목록 */}
             <Card className="overflow-hidden">
-              <div className="p-4 border-b border-slate-200">
+              <div className="p-4 border-b border-slate-200 flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-slate-900">수요조사 목록</h2>
+                <Button
+                  variant={showAddForm ? "secondary" : "primary"}
+                  size="sm"
+                  onClick={() => setShowAddForm(!showAddForm)}
+                  icon={showAddForm ? X : Plus}
+                >
+                  {showAddForm ? '취소' : '직접 추가'}
+                </Button>
               </div>
+              
+              {/* 수요조사 추가 폼 */}
+              {showAddForm && (
+                <div className="p-4 bg-indigo-50 border-b border-indigo-200">
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                          신청교사명 <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={addFormData.teacherName}
+                          onChange={(e) => setAddFormData(prev => ({ ...prev, teacherName: e.target.value }))}
+                          placeholder="예: 김교사"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                          사용 과목 <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={addFormData.subject}
+                          onChange={(e) => setAddFormData(prev => ({ ...prev, subject: e.target.value }))}
+                          placeholder="예: 영어, 수학, 전교과 등"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* 제품명 입력 (에듀집 검색) */}
+                    <div className="relative">
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        제품명 <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={productSearch}
+                          onChange={(e) => handleAddProductInputChange(e.target.value)}
+                          onFocus={() => setShowProductDropdown(true)}
+                          onBlur={() => setTimeout(() => setShowProductDropdown(false), 200)}
+                          placeholder="에듀집 제품 검색 또는 직접 입력"
+                          className={`w-full px-3 py-2 border rounded-lg text-sm pr-24 ${
+                            addFormData.productName && !addFormData.isInEduzip 
+                              ? 'border-amber-400 bg-amber-50' 
+                              : addFormData.productName && addFormData.isInEduzip
+                              ? 'border-green-400 bg-green-50'
+                              : 'border-slate-300 bg-white'
+                          }`}
+                        />
+                        {addFormData.productName && (
+                          <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs px-2 py-1 rounded ${
+                            addFormData.isInEduzip 
+                              ? 'bg-green-100 text-green-700' 
+                              : 'bg-amber-100 text-amber-700'
+                          }`}>
+                            {addFormData.isInEduzip ? '에듀집 등록' : '미등록'}
+                          </span>
+                        )}
+                      </div>
+                      
+                      {showProductDropdown && productSearch && (
+                        <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                          {filteredProducts.length > 0 ? (
+                            filteredProducts.map((product) => (
+                              <button
+                                key={product.id}
+                                type="button"
+                                onClick={() => handleAddProductSelect(product)}
+                                className="w-full px-3 py-2 text-left hover:bg-indigo-50 text-sm border-b border-slate-100 last:border-b-0"
+                              >
+                                <p className="font-medium text-slate-900">{product.name}</p>
+                                <p className="text-xs text-slate-500">{product.provider}</p>
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-3 py-2 text-sm text-slate-500">
+                              에듀집 미등록 제품입니다
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                          주요 용도 <span className="text-red-500">*</span>
+                          <span className="text-slate-400 font-normal ml-2">({addFormData.purpose.length}/30자)</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={addFormData.purpose}
+                          onChange={(e) => setAddFormData(prev => ({ ...prev, purpose: e.target.value.slice(0, 30) }))}
+                          placeholder="예: 학생 영작문 피드백 및 교정"
+                          maxLength={30}
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                          학생 개인정보 포함 여부 <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={addFormData.hasPersonalInfo}
+                          onChange={(e) => setAddFormData(prev => ({ ...prev, hasPersonalInfo: e.target.value }))}
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"
+                        >
+                          <option value="">선택하세요</option>
+                          <option value="yes">예</option>
+                          <option value="no">아니오</option>
+                        </select>
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-end">
+                      <Button
+                        variant="primary"
+                        onClick={handleAddSubmit}
+                        icon={Plus}
+                      >
+                        수요조사 추가
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
               
               {surveys.length === 0 ? (
                 <div className="p-12 text-center">
