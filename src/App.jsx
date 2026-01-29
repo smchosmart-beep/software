@@ -1956,20 +1956,23 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
           </>
         ) : activeTab === 'form2' ? (
           <>
-            {/* 서식2 체크리스트 - 웹하드 iframe */}
-            <Card className="mb-6 overflow-hidden">
+            {/* 서식2 체크리스트 - 웹하드 링크 (iframe 제거: 임베드 시 401 콘솔 에러 무한 발생) */}
+            <Card className="mb-6">
               <div className="p-4 border-b border-slate-200">
                 <h2 className="text-lg font-semibold text-slate-900">[서식2] 체크리스트</h2>
                 <p className="text-sm text-slate-500 mt-1">체크리스트는 웹하드에서 확인·관리합니다.</p>
               </div>
-              <div className="w-full bg-slate-100" style={{ minHeight: '70vh' }}>
-                <iframe
-                  src={FORM2_WEBHARD_URL}
-                  title="서식2 체크리스트 웹하드"
-                  className="w-full border-0"
-                  style={{ height: '70vh', minHeight: '500px' }}
-                  sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-                />
+              <div className="p-8 text-center">
+                <p className="text-slate-600 mb-4">체크리스트를 보려면 웹하드를 열어주세요.</p>
+                <a
+                  href={FORM2_WEBHARD_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-5 py-3 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                  웹하드 열기
+                </a>
               </div>
             </Card>
           </>
