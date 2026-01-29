@@ -1,10 +1,9 @@
 [build]
   command = "npm run build"
   publish = "dist"
+  functions = "netlify/functions"
 
-# 실제 파일(예: .hwp)이 있으면 그대로 서빙, 없을 때만 SPA로
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-  force = false

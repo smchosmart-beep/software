@@ -505,19 +505,16 @@ const parseSchoolCodeInput = (input) => {
   return null;
 };
 
-// 나이스 API로 학교 정보 조회 (CORS Proxy 사용)
+// 나이스 API로 학교 정보 조회 (Netlify Function 사용)
 const fetchSchoolInfo = async (schoolCodeInput) => {
   const parsed = parseSchoolCodeInput(schoolCodeInput);
   if (!parsed) return { success: false };
 
-  const params = { SD_SCHUL_CODE: parsed.sdSchulCode };
-  if (parsed.atptOfcdcScCode) params.ATPT_OFCDC_SC_CODE = parsed.atptOfcdcScCode;
-
-  const apiUrl = buildSchoolInfoUrl(params);
-  const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
+  const params = new URLSearchParams({ SD_SCHUL_CODE: parsed.sdSchulCode });
+  if (parsed.atptOfcdcScCode) params.append('ATPT_OFCDC_SC_CODE', parsed.atptOfcdcScCode);
 
   try {
-    const response = await fetch(proxyUrl);
+    const response = await fetch(`/.netlify/functions/neis?${params.toString()}`);
     const data = await response.json();
 
     const head = data.schoolInfo?.[0]?.head;
@@ -546,12 +543,11 @@ const fetchSchoolInfo = async (schoolCodeInput) => {
   }
 };
 
-// 학교명으로 검색해 API가 반환하는 학교코드 확인 (형식 검증용)
+// 학교명으로 검색해 API가 반환하는 학교코드 확인 (Netlify Function 사용)
 const fetchSchoolListByName = async (schoolName) => {
-  const apiUrl = buildSchoolInfoUrl({ SCHUL_NM: schoolName });
-  const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
+  const params = new URLSearchParams({ SCHUL_NM: schoolName });
   try {
-    const response = await fetch(proxyUrl);
+    const response = await fetch(`/.netlify/functions/neis?${params.toString()}`);
     const data = await response.json();
     const row = data.schoolInfo?.[1]?.row;
     const list = Array.isArray(row) ? row : row ? [row] : [];
