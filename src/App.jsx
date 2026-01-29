@@ -670,8 +670,9 @@ const MainPage = ({ onNavigate }) => {
     }
   };
 
-  const applyCodeFromSearch = (fullCode) => {
-    setSchoolCode(fullCode);
+  const applyCodeFromSearch = (school) => {
+    setSchoolCode(school.fullCode);
+    setSchoolName(school.name);
     setCodeSearchResults([]);
     setCodeSearchName('');
   };
@@ -700,6 +701,53 @@ const MainPage = ({ onNavigate }) => {
         )}
         
         <div className="space-y-4">
+          {/* 1. 학교명으로 NEIS 코드 조회 (맨 위) */}
+          <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+            <p className="text-sm font-medium text-indigo-900 mb-3">🔍 학교 검색</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={codeSearchName}
+                onChange={(e) => setCodeSearchName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearchCodeByName()}
+                placeholder="학교명 입력 (예: 상명초등학교)"
+                disabled={isVerified}
+                className="flex-1 px-3 py-2 text-sm border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100"
+              />
+              <button
+                type="button"
+                onClick={handleSearchCodeByName}
+                disabled={codeSearchLoading || isVerified}
+                className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium"
+              >
+                {codeSearchLoading ? '조회 중...' : '조회'}
+              </button>
+            </div>
+            {codeSearchResults.length > 0 && (
+              <ul className="mt-3 space-y-2 max-h-40 overflow-y-auto">
+                {codeSearchResults.map((s, i) => (
+                  <li key={i} className="flex items-center justify-between gap-2 bg-white p-3 rounded-lg border border-indigo-200">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-900 truncate">{s.name}</p>
+                      <p className="text-xs text-slate-500 truncate">{s.address}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => applyCodeFromSearch(s)}
+                      className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium shrink-0"
+                    >
+                      사용
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {codeSearchDone && codeSearchResults.length === 0 && codeSearchName.trim() && (
+              <p className="mt-2 text-sm text-indigo-700">검색 결과가 없습니다.</p>
+            )}
+          </div>
+
+          {/* 2. 학교명 입력 (자동 입력됨) */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">
               학교명 <span className="text-red-500">*</span>
@@ -708,12 +756,13 @@ const MainPage = ({ onNavigate }) => {
               type="text"
               value={schoolName}
               onChange={(e) => handleSchoolNameChange(e.target.value)}
-              placeholder="예: 상명초등학교"
+              placeholder="위에서 학교를 검색하세요"
               disabled={isVerified}
               className={`w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 ${isVerified ? 'bg-slate-100' : ''}`}
             />
           </div>
           
+          {/* 3. NEIS 학교코드 입력 (자동 입력됨) */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">
               NEIS 학교코드 <span className="text-red-500">*</span>
@@ -722,64 +771,19 @@ const MainPage = ({ onNavigate }) => {
               type="text"
               value={schoolCode}
               onChange={(e) => handleSchoolCodeChange(e.target.value)}
-              placeholder="예: 7010911 또는 B107010911"
+              placeholder="위에서 학교를 검색하세요"
               maxLength={10}
               disabled={isVerified}
               className={`w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 font-mono ${isVerified ? 'bg-slate-100' : ''}`}
             />
-            <p className="mt-1.5 text-xs text-slate-500">
-              표준학교코드 7자리(7010911) 또는 시도교육청코드+표준학교코드 10자리(B107010911). 아래에서 학교명으로 코드를 조회할 수 있습니다.
-            </p>
-            <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
-              <p className="text-xs font-medium text-slate-600 mb-2">학교명으로 NEIS 코드 조회</p>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={codeSearchName}
-                  onChange={(e) => setCodeSearchName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearchCodeByName()}
-                  placeholder="예: 상명초등학교"
-                  className="flex-1 px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                />
-                <button
-                  type="button"
-                  onClick={handleSearchCodeByName}
-                  disabled={codeSearchLoading}
-                  className="px-3 py-1.5 text-sm bg-slate-200 text-slate-700 rounded hover:bg-slate-300 disabled:opacity-50"
-                >
-                  {codeSearchLoading ? '조회 중...' : '조회'}
-                </button>
-              </div>
-              {codeSearchResults.length > 0 && (
-                <ul className="mt-2 space-y-1.5 max-h-32 overflow-y-auto">
-                  {codeSearchResults.map((s, i) => (
-                    <li key={i} className="text-xs flex items-center justify-between gap-2 bg-white p-2 rounded border border-slate-200">
-                      <span className="text-slate-700 truncate">{s.name}</span>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <code className="text-indigo-600 font-mono">{s.fullCode}</code>
-                        <button
-                          type="button"
-                          onClick={() => applyCodeFromSearch(s.fullCode)}
-                          className="text-indigo-600 hover:underline"
-                        >
-                          사용
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {codeSearchDone && codeSearchResults.length === 0 && codeSearchName.trim() && (
-                <p className="mt-2 text-xs text-slate-500">검색 결과가 없습니다.</p>
-              )}
-            </div>
           </div>
           
+          {/* 4. 학교 정보 확인 버튼 */}
           {!isVerified ? (
             <Button
               variant="secondary"
               onClick={handleVerify}
-              disabled={isLoading}
+              disabled={isLoading || !schoolName || !schoolCode}
               className="w-full"
             >
               {isLoading ? '확인 중...' : '학교 정보 확인'}
@@ -806,6 +810,7 @@ const MainPage = ({ onNavigate }) => {
             </div>
           )}
           
+          {/* 5. 역할 선택 */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-3">
               역할 선택 <span className="text-red-500">*</span>
@@ -855,6 +860,7 @@ const MainPage = ({ onNavigate }) => {
             </div>
           </div>
           
+          {/* 6. 입장하기 버튼 */}
           <Button
             variant="primary"
             size="lg"
