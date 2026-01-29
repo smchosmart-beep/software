@@ -702,6 +702,7 @@ const MainPage = ({ onNavigate }) => {
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md p-8">
         <div className="text-center mb-8">
+          <p className="text-sm text-slate-500 mb-2">class1234.com</p>
           <a
             href="https://class1234.com"
             target="_blank"
@@ -808,46 +809,45 @@ const MainPage = ({ onNavigate }) => {
             <label className="block text-sm font-medium text-slate-700 mb-3">
               역할 선택 <span className="text-red-500">*</span>
             </label>
-            <div className="grid grid-cols-1 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => setRole('teacher')}
-                className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-all duration-200 ${
+                className={`flex flex-col sm:flex-row items-center gap-2 sm:gap-3 p-4 rounded-lg border-2 transition-all duration-200 w-full min-w-0 ${
                   role === 'teacher'
                     ? 'border-indigo-600 bg-indigo-50'
                     : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
                   role === 'teacher' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'
                 }`}>
                   <Users className="w-5 h-5" />
                 </div>
-                <div className="text-left">
-                  <p className={`font-medium ${role === 'teacher' ? 'text-indigo-900' : 'text-slate-900'}`}>
+                <div className="text-center sm:text-left min-w-0">
+                  <p className={`font-medium text-sm ${role === 'teacher' ? 'text-indigo-900' : 'text-slate-900'}`}>
                     일반 교사
                   </p>
-                  <p className="text-sm text-slate-500">수요조사 입력</p>
+                  <p className="text-xs text-slate-500">수요조사 참여</p>
                 </div>
               </button>
-              
               <button
                 onClick={() => setRole('manager')}
-                className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-all duration-200 ${
+                className={`flex flex-col sm:flex-row items-center gap-2 sm:gap-3 p-4 rounded-lg border-2 transition-all duration-200 w-full min-w-0 ${
                   role === 'manager'
                     ? 'border-indigo-600 bg-indigo-50'
                     : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
                   role === 'manager' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'
                 }`}>
                   <Shield className="w-5 h-5" />
                 </div>
-                <div className="text-left">
-                  <p className={`font-medium ${role === 'manager' ? 'text-indigo-900' : 'text-slate-900'}`}>
+                <div className="text-center sm:text-left min-w-0">
+                  <p className={`font-medium text-sm ${role === 'manager' ? 'text-indigo-900' : 'text-slate-900'}`}>
                     정보부장
                   </p>
-                  <p className="text-sm text-slate-500">수요조사 관리 및 엑셀 다운로드</p>
+                  <p className="text-xs text-slate-500">심의자료 생성</p>
                 </div>
               </button>
             </div>
@@ -871,7 +871,7 @@ const MainPage = ({ onNavigate }) => {
 };
 
 // ============================================
-// 페이지: 일반 교사 (수요조사 입력)
+// 페이지: 일반 교사 (수요조사 참여)
 // ============================================
 
 const TeacherPage = ({ schoolCode, schoolName, onBack }) => {
@@ -1010,7 +1010,7 @@ const TeacherPage = ({ schoolCode, schoolName, onBack }) => {
           </button>
           <div>
             <h1 className="text-lg font-semibold text-slate-900">{schoolName}</h1>
-            <p className="text-sm text-slate-500">수요조사 입력</p>
+            <p className="text-sm text-slate-500">수요조사 참여</p>
           </div>
         </div>
       </header>
@@ -2292,12 +2292,16 @@ export default function App() {
     setSchoolName('');
   };
   
-  switch (currentPage) {
-    case 'teacher':
-      return <TeacherPage schoolCode={schoolCode} schoolName={schoolName} onBack={handleBack} />;
-    case 'manager':
-      return <ManagerPage schoolCode={schoolCode} schoolName={schoolName} onBack={handleBack} />;
-    default:
-      return <MainPage onNavigate={handleNavigate} />;
-  }
+  return (
+    <div className="min-h-screen flex flex-col">
+      <div className="flex-1">
+        {currentPage === 'teacher' && <TeacherPage schoolCode={schoolCode} schoolName={schoolName} onBack={handleBack} />}
+        {currentPage === 'manager' && <ManagerPage schoolCode={schoolCode} schoolName={schoolName} onBack={handleBack} />}
+        {currentPage === 'main' && <MainPage onNavigate={handleNavigate} />}
+      </div>
+      <footer className="py-3 px-4 text-center text-sm text-slate-500 border-t border-slate-200 bg-white">
+        선생님들의 칼퇴근을 위해 무료로 배포합니다. -클래스페이-
+      </footer>
+    </div>
+  );
 }
