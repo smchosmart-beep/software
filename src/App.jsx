@@ -27,9 +27,22 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 // [서식2] 체크리스트 웹하드 링크
 const FORM2_WEBHARD_URL = 'https://works.do/xfWoVL3';
 
+// 체크리스트 파일 스토리지 버킷 (Supabase Storage)
+const CHECKLIST_BUCKET = 'checklists';
+
 // ============================================
 // Supabase API 함수들
 // ============================================
+
+// 연번으로 체크리스트 파일 다운로드 (.hwpx 시도 후 .hwp 시도)
+const downloadChecklistFile = async (seqNo) => {
+  for (const ext of ['hwpx', 'hwp']) {
+    const path = `${seqNo}.${ext}`;
+    const { data, error } = await supabase.storage.from(CHECKLIST_BUCKET).download(path);
+    if (!error && data) return { blob: data, ext };
+  }
+  return null;
+};
 
 // 에듀집 제품 목록 조회
 const fetchEduzipProducts = async () => {
@@ -43,9 +56,10 @@ const fetchEduzipProducts = async () => {
     return [];
   }
   
-  // criteria 배열로 변환
+  // criteria 배열로 변환 (seq_no: 연번 → 체크리스트 파일명 매핑용, 예: 1 → 1.hwp)
   return data.map(item => ({
     id: item.id,
+    seqNo: item.seq_no,
     name: item.name,
     provider: item.provider,
     type: item.type,
@@ -1404,6 +1418,50 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
     }
   };
   
+  // 체크리스트 일괄 다운로드 (선정이유 작성된 제품만, .hwpx → .hwp 순으로 시도)
+  const handleDownloadChecklists = async () => {
+    const productsWithReason = getUniqueProducts().filter(p => form3Data[p.productName]?.reason);
+    if (productsWithReason.length === 0) {
+      setAlert({ type: 'error', message: '선정이유가 입력된 제품이 없습니다. [서식3]에서 선정이유를 먼저 작성해주세요.' });
+      return;
+    }
+    const productsWithSeqNo = productsWithReason.filter(p => p.eduzipData?.seqNo != null);
+    if (productsWithSeqNo.length === 0) {
+      setAlert({ type: 'error', message: '연번(seq_no)이 있는 제품이 없어 체크리스트를 받을 수 없습니다.' });
+      return;
+    }
+    let downloaded = 0;
+    const safeName = (name) => (name || '').replace(/[/\\:*?"<>|]/g, '_').trim() || 'checklist';
+    try {
+      for (const product of productsWithSeqNo) {
+        const seqNo = product.eduzipData.seqNo;
+        const result = await downloadChecklistFile(seqNo);
+        if (result) {
+          const url = URL.createObjectURL(result.blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${safeName(product.productName)}_${seqNo}.${result.ext}`;
+          a.click();
+          URL.revokeObjectURL(url);
+          downloaded++;
+        }
+      }
+      if (downloaded > 0) {
+        const skipped = productsWithSeqNo.length - downloaded;
+        setAlert({
+          type: 'success',
+          message: skipped > 0
+            ? `체크리스트 ${downloaded}개 다운로드되었습니다. (스토리지에 없는 파일 ${skipped}개)`
+            : `체크리스트 ${downloaded}개 다운로드되었습니다.`
+        });
+      } else {
+        setAlert({ type: 'error', message: '체크리스트 파일을 받지 못했습니다. 스토리지에 해당 연번 파일이 있는지 확인해주세요.' });
+      }
+    } catch (error) {
+      setAlert({ type: 'error', message: '체크리스트 다운로드 중 오류가 발생했습니다.' });
+    }
+  };
+  
   const handleEdit = (survey) => {
     setEditingId(survey.id);
     setEditForm({
@@ -1491,18 +1549,38 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
                 [서식1] 엑셀 다운로드
               </Button>
             ) : activeTab === 'form2' ? (
-              <Button variant="secondary" icon={Download} disabled>
-                [서식2] 엑셀 다운로드
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="primary"
+                  icon={Download}
+                  onClick={handleDownloadChecklists}
+                  disabled={!getUniqueProducts().some(p => form3Data[p.productName]?.reason && p.eduzipData?.seqNo != null)}
+                >
+                  체크리스트 일괄 다운로드
+                </Button>
+                <Button variant="secondary" icon={Download} disabled>
+                  [서식2] 엑셀 다운로드
+                </Button>
+              </div>
             ) : (
-              <Button
-                variant="primary"
-                onClick={handleExportForm3}
-                icon={Download}
-                disabled={surveys.length === 0}
-              >
-                [서식3] 엑셀 다운로드
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="primary"
+                  onClick={handleExportForm3}
+                  icon={Download}
+                  disabled={surveys.length === 0}
+                >
+                  [서식3] 엑셀 다운로드
+                </Button>
+                <Button
+                  variant="secondary"
+                  icon={Download}
+                  onClick={handleDownloadChecklists}
+                  disabled={!getUniqueProducts().some(p => form3Data[p.productName]?.reason && p.eduzipData?.seqNo != null)}
+                >
+                  체크리스트 일괄 다운로드
+                </Button>
+              </div>
             )}
           </div>
           
@@ -1962,17 +2040,27 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
                 <h2 className="text-lg font-semibold text-slate-900">[서식2] 체크리스트</h2>
                 <p className="text-sm text-slate-500 mt-1">체크리스트는 웹하드에서 확인·관리합니다.</p>
               </div>
-              <div className="p-8 text-center">
-                <p className="text-slate-600 mb-4">체크리스트를 보려면 웹하드를 열어주세요.</p>
-                <a
-                  href={FORM2_WEBHARD_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-5 py-3 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                  웹하드 열기
-                </a>
+              <div className="p-8 text-center space-y-4">
+                <p className="text-slate-600">체크리스트를 보려면 웹하드를 열거나, 선정이유를 작성한 제품의 체크리스트를 일괄 다운로드할 수 있습니다.</p>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <a
+                    href={FORM2_WEBHARD_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-5 py-3 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                    웹하드 열기
+                  </a>
+                  <Button
+                    variant="primary"
+                    icon={Download}
+                    onClick={handleDownloadChecklists}
+                    disabled={!getUniqueProducts().some(p => form3Data[p.productName]?.reason && p.eduzipData?.seqNo != null)}
+                  >
+                    체크리스트 일괄 다운로드
+                  </Button>
+                </div>
               </div>
             </Card>
           </>
