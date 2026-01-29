@@ -24,6 +24,9 @@ const supabaseUrl = 'https://yrywezxcnoglkpsloynu.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlyeXdlenhjbm9nbGtwc2xveW51Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1ODMxOTYsImV4cCI6MjA4NTE1OTE5Nn0.0pIUdNXRFrqJSDm8Ponhp39L5GKhZn35Q55ItH7Dct4';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// [서식2] 체크리스트 웹하드 링크
+const FORM2_WEBHARD_URL = 'https://works.do/xfWoVL3';
+
 // ============================================
 // Supabase API 함수들
 // ============================================
@@ -1953,20 +1956,20 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
           </>
         ) : activeTab === 'form2' ? (
           <>
-            {/* 서식2 체크리스트 */}
-            <Card className="mb-6">
+            {/* 서식2 체크리스트 - 웹하드 iframe */}
+            <Card className="mb-6 overflow-hidden">
               <div className="p-4 border-b border-slate-200">
                 <h2 className="text-lg font-semibold text-slate-900">[서식2] 체크리스트</h2>
-                <p className="text-sm text-slate-500 mt-1">체크리스트 항목을 확인·관리합니다.</p>
+                <p className="text-sm text-slate-500 mt-1">체크리스트는 웹하드에서 확인·관리합니다.</p>
               </div>
-              <div className="p-6">
-                {surveys.length === 0 ? (
-                  <div className="py-12 text-center text-slate-500">
-                    <p>먼저 수요조사를 진행해주세요.</p>
-                  </div>
-                ) : (
-                  <p className="text-slate-600">체크리스트 내용은 추후 구성됩니다.</p>
-                )}
+              <div className="w-full bg-slate-100" style={{ minHeight: '70vh' }}>
+                <iframe
+                  src={FORM2_WEBHARD_URL}
+                  title="서식2 체크리스트 웹하드"
+                  className="w-full border-0"
+                  style={{ height: '70vh', minHeight: '500px' }}
+                  sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                />
               </div>
             </Card>
           </>
