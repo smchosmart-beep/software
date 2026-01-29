@@ -1,3 +1,8 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* 로고 등 투명 이미지가 흰 배경에서 잘 보이도록 */
+html, body {
+  background-color: #ffffff;
+}

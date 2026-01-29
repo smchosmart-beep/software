@@ -702,7 +702,14 @@ const MainPage = ({ onNavigate }) => {
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <img src="/logo.png" alt="로고" className="w-16 h-16 rounded-2xl mx-auto mb-4 object-contain" />
+          <a
+            href="https://class1234.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white mx-auto mb-4 cursor-pointer transition-transform duration-200 hover:scale-110 hover:shadow-md active:scale-95"
+          >
+            <img src="/logo.png" alt="로고" className="w-16 h-16 object-contain pointer-events-none" />
+          </a>
           <h1 className="text-2xl font-bold text-slate-900 mb-2">학습지원 소프트웨어</h1>
           <p className="text-slate-600 mb-4">수요조사 및 심의자료 생성 시스템</p>
           <a
@@ -2060,14 +2067,16 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
                     href={FORM2_WEBHARD_URL}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-5 py-3 bg-slate-600 text-white text-sm font-medium rounded-lg hover:bg-slate-700 transition-colors"
+                    className="inline-flex items-center justify-center gap-2 px-5 py-3 min-w-[240px] bg-slate-600 text-white text-sm font-medium rounded-lg hover:bg-slate-700 transition-colors"
                   >
-                    <Download className="w-4 h-4" />
+                    <Download className="w-4 h-4 shrink-0" />
                     에듀집 미등록 체크리스트
                   </a>
                   <Button
                     variant="primary"
+                    icon={Download}
                     onClick={() => setShowChecklistGuideModal(true)}
+                    className="min-w-[240px] px-5 py-3"
                   >
                     에듀집 등록 체크리스트
                   </Button>
