@@ -1177,7 +1177,7 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
   const [alert, setAlert] = useState(null);
   
   // 탭 관리
-  const [activeTab, setActiveTab] = useState('survey'); // 'survey' | 'form3'
+  const [activeTab, setActiveTab] = useState('survey'); // 'survey' | 'form2' | 'form3'
   
   // 서식3 관련 상태
   const [eduzipProducts, setEduzipProducts] = useState([]);
@@ -1487,6 +1487,10 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
               >
                 [서식1] 엑셀 다운로드
               </Button>
+            ) : activeTab === 'form2' ? (
+              <Button variant="secondary" icon={Download} disabled>
+                [서식2] 엑셀 다운로드
+              </Button>
             ) : (
               <Button
                 variant="primary"
@@ -1510,6 +1514,16 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
               }`}
             >
               [서식1] 수요조사 취합
+            </button>
+            <button
+              onClick={() => setActiveTab('form2')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                activeTab === 'form2'
+                  ? 'bg-indigo-100 text-indigo-700'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              [서식2] 체크리스트
             </button>
             <button
               onClick={() => setActiveTab('form3')}
@@ -1935,6 +1949,25 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
                   </table>
                 </div>
               )}
+            </Card>
+          </>
+        ) : activeTab === 'form2' ? (
+          <>
+            {/* 서식2 체크리스트 */}
+            <Card className="mb-6">
+              <div className="p-4 border-b border-slate-200">
+                <h2 className="text-lg font-semibold text-slate-900">[서식2] 체크리스트</h2>
+                <p className="text-sm text-slate-500 mt-1">체크리스트 항목을 확인·관리합니다.</p>
+              </div>
+              <div className="p-6">
+                {surveys.length === 0 ? (
+                  <div className="py-12 text-center text-slate-500">
+                    <p>먼저 수요조사를 진행해주세요.</p>
+                  </div>
+                ) : (
+                  <p className="text-slate-600">체크리스트 내용은 추후 구성됩니다.</p>
+                )}
+              </div>
             </Card>
           </>
         ) : (
