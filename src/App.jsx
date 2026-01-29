@@ -2293,13 +2293,13 @@ export default function App() {
   };
   
   return (
-    <div className="min-h-screen flex flex-col">
-      <div className="flex-1">
+    <div className="min-h-screen flex flex-col pb-14">
+      <div className="flex-1 min-h-0">
         {currentPage === 'teacher' && <TeacherPage schoolCode={schoolCode} schoolName={schoolName} onBack={handleBack} />}
         {currentPage === 'manager' && <ManagerPage schoolCode={schoolCode} schoolName={schoolName} onBack={handleBack} />}
         {currentPage === 'main' && <MainPage onNavigate={handleNavigate} />}
       </div>
-      <footer className="py-3 px-4 text-center text-sm text-slate-500 border-t border-slate-200 bg-white">
+      <footer className="fixed bottom-0 left-0 right-0 py-3 px-4 text-center text-sm text-slate-500 border-t border-slate-200 bg-white z-10">
         선생님들의 칼퇴근을 위해 무료로 배포합니다. -클래스페이-
       </footer>
     </div>
