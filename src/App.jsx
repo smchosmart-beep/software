@@ -845,7 +845,7 @@ const MainPage = ({ onNavigate }) => {
                 </div>
                 <div className="text-center sm:text-left min-w-0">
                   <p className={`font-medium text-sm ${role === 'manager' ? 'text-indigo-900' : 'text-slate-900'}`}>
-                    정보부장
+                    담당 교사
                   </p>
                   <p className="text-xs text-slate-500">심의자료 생성</p>
                 </div>
@@ -1191,7 +1191,7 @@ const TeacherPage = ({ schoolCode, schoolName, onBack }) => {
 };
 
 // ============================================
-// 페이지: 정보부장 (수요조사 관리)
+// 페이지: 담당 교사 (수요조사 관리)
 // ============================================
 
 const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
@@ -1570,19 +1570,7 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
               >
                 [서식1] 엑셀 다운로드
               </Button>
-            ) : activeTab === 'form2' ? (
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="primary"
-                  onClick={() => setShowChecklistGuideModal(true)}
-                >
-                  에듀집 등록 체크리스트
-                </Button>
-                <Button variant="secondary" icon={Download} disabled>
-                  [서식2] 엑셀 다운로드
-                </Button>
-              </div>
-            ) : (
+            ) : activeTab === 'form2' ? null : (
               <div className="flex items-center gap-2">
                 <Button
                   variant="primary"
