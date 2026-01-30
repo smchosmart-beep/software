@@ -614,6 +614,56 @@ const fetchSchoolListByName = async (schoolName) => {
   }
 };
 
+// 학교 비밀번호 API (Netlify Function)
+const fetchSchoolPasswordStatus = async (schoolCode) => {
+  try {
+    const res = await fetch(`/.netlify/functions/school-password?school_code=${encodeURIComponent(schoolCode.trim().toUpperCase())}`);
+    const data = await res.json();
+    if (!res.ok) return { hasPassword: false };
+    return { hasPassword: !!data.hasPassword };
+  } catch (e) {
+    console.error('학교 비밀번호 상태 조회 오류:', e);
+    return { hasPassword: false };
+  }
+};
+
+const setSchoolPassword = async (schoolCode, password, role) => {
+  const res = await fetch('/.netlify/functions/school-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'set', school_code: schoolCode.trim().toUpperCase(), password, role })
+  });
+  const data = await res.json();
+  if (!res.ok) return { success: false, error: data.error || '설정 실패' };
+  return { success: true };
+};
+
+const verifySchoolPassword = async (schoolCode, password) => {
+  const res = await fetch('/.netlify/functions/school-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'verify', school_code: schoolCode.trim().toUpperCase(), password })
+  });
+  const data = await res.json();
+  if (!res.ok) return { valid: false, error: data.error };
+  return { valid: !!data.valid, error: data.error };
+};
+
+const changeSchoolPassword = async (schoolCode, currentPassword, newPassword) => {
+  const res = await fetch('/.netlify/functions/school-password', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      school_code: schoolCode.trim().toUpperCase(),
+      current_password: currentPassword,
+      new_password: newPassword
+    })
+  });
+  const data = await res.json();
+  if (!res.ok) return { success: false, error: data.error || '변경 실패' };
+  return { success: data.success !== false, error: data.error };
+};
+
 const MainPage = ({ onNavigate }) => {
   const [schoolName, setSchoolName] = useState('');
   const [schoolCode, setSchoolCode] = useState('');
@@ -624,8 +674,16 @@ const MainPage = ({ onNavigate }) => {
   const [codeSearchResults, setCodeSearchResults] = useState([]);
   const [codeSearchLoading, setCodeSearchLoading] = useState(false);
   const [codeSearchDone, setCodeSearchDone] = useState(false);
+  // 비밀번호 단계: pendingEntry = { schoolCode, schoolName } (NEIS 검증 통과 후), 모달 표시용
+  const [pendingEntry, setPendingEntry] = useState(null);
+  const [showSetPasswordModal, setShowSetPasswordModal] = useState(false);
+  const [showVerifyPasswordModal, setShowVerifyPasswordModal] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
   
-  // 입장하기 (검증 + 페이지 이동)
+  // 입장하기 (NEIS 검증 → 비밀번호 단계 → 페이지 이동)
   const handleSubmit = async () => {
     if (!schoolName.trim()) {
       setError('학교명을 입력해주세요.');
@@ -640,7 +698,6 @@ const MainPage = ({ onNavigate }) => {
       return;
     }
     
-    // NEIS 학교코드 형식 검사
     const parsed = parseSchoolCodeInput(schoolCode);
     if (!parsed) {
       setError('올바른 NEIS 학교코드 형식이 아닙니다.');
@@ -651,7 +708,6 @@ const MainPage = ({ onNavigate }) => {
     setError('');
     
     const info = await fetchSchoolInfo(schoolCode.trim());
-    
     setIsLoading(false);
     
     if (!info.success) {
@@ -659,20 +715,83 @@ const MainPage = ({ onNavigate }) => {
       return;
     }
     
-    // 학교명 일치 여부 확인 (공백 제거 후 비교)
     const inputName = schoolName.replace(/\s/g, '').toLowerCase();
     const apiName = info.schoolName.replace(/\s/g, '').toLowerCase();
-    
     if (!apiName.includes(inputName) && !inputName.includes(apiName)) {
       setError(`입력하신 학교명과 일치하지 않습니다. (실제: ${info.schoolName})`);
       return;
     }
     
-    // 검증 성공 → 페이지 이동
+    const code = schoolCode.trim().toUpperCase();
+    const status = await fetchSchoolPasswordStatus(code);
+    
+    if (!status.hasPassword) {
+      if (role === 'teacher') {
+        setError('비밀번호가 아직 설정되지 않았습니다. 담당 교사가 먼저 입장해 비밀번호를 설정해 주세요.');
+        return;
+      }
+      setPendingEntry({ schoolCode: code, schoolName: info.schoolName });
+      setPasswordInput('');
+      setPasswordConfirm('');
+      setPasswordError('');
+      setShowSetPasswordModal(true);
+      return;
+    }
+    
+    setPendingEntry({ schoolCode: code, schoolName: info.schoolName });
+    setPasswordInput('');
+    setPasswordError('');
+    setShowVerifyPasswordModal(true);
+  };
+
+  const doNavigate = () => {
+    if (!pendingEntry || !role) return;
     if (role === 'teacher') {
-      onNavigate('teacher', schoolCode.toUpperCase(), info.schoolName);
-    } else if (role === 'manager') {
-      onNavigate('manager', schoolCode.toUpperCase(), info.schoolName);
+      onNavigate('teacher', pendingEntry.schoolCode, pendingEntry.schoolName);
+    } else {
+      onNavigate('manager', pendingEntry.schoolCode, pendingEntry.schoolName);
+    }
+    setPendingEntry(null);
+    setShowSetPasswordModal(false);
+    setShowVerifyPasswordModal(false);
+    setPasswordInput('');
+    setPasswordConfirm('');
+    setPasswordError('');
+  };
+
+  const handleSetPasswordConfirm = async () => {
+    if (!/^\d{4}$/.test(passwordInput)) {
+      setPasswordError('비밀번호는 숫자 4자리여야 합니다.');
+      return;
+    }
+    if (passwordInput !== passwordConfirm) {
+      setPasswordError('비밀번호가 일치하지 않습니다.');
+      return;
+    }
+    setPasswordLoading(true);
+    setPasswordError('');
+    const result = await setSchoolPassword(pendingEntry.schoolCode, passwordInput, 'manager');
+    setPasswordLoading(false);
+    if (result.success) {
+      doNavigate();
+    } else {
+      setPasswordError(result.error || '설정에 실패했습니다.');
+    }
+  };
+
+  const handleVerifyPasswordConfirm = async () => {
+    if (!/^\d{4}$/.test(passwordInput)) {
+      setPasswordError('비밀번호는 숫자 4자리여야 합니다.');
+      return;
+    }
+    setPasswordLoading(true);
+    setPasswordError('');
+    const result = await verifySchoolPassword(pendingEntry.schoolCode, passwordInput);
+    setPasswordLoading(false);
+    if (result.valid) {
+      doNavigate();
+    } else {
+      setPasswordError(result.error || '비밀번호가 일치하지 않습니다.');
     }
   };
 
@@ -865,6 +984,109 @@ const MainPage = ({ onNavigate }) => {
           </Button>
         </div>
       </Card>
+
+      {/* 비밀번호 설정 모달 (담당 교사 최초 입장) */}
+      {showSetPasswordModal && pendingEntry && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
+            <h3 className="text-lg font-semibold text-slate-900 mb-1">학교 비밀번호 설정</h3>
+            <p className="text-sm text-slate-600 mb-4">
+              이 학교의 입장 비밀번호(4자리)를 설정합니다. 담당 교사·일반 교사 모두 동일한 비밀번호로 입장합니다.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">비밀번호 4자리</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  placeholder="0000"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">비밀번호 확인</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={passwordConfirm}
+                  onChange={(e) => setPasswordConfirm(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  placeholder="0000"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+            {passwordError && (
+              <p className="mt-2 text-sm text-red-600">{passwordError}</p>
+            )}
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => { setShowSetPasswordModal(false); setPendingEntry(null); setPasswordError(''); }}
+                className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50"
+              >
+                취소
+              </button>
+              <Button
+                variant="primary"
+                onClick={handleSetPasswordConfirm}
+                disabled={passwordLoading}
+                className="flex-1"
+              >
+                {passwordLoading ? '설정 중...' : '설정 후 입장'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 비밀번호 입력 모달 (이미 설정된 학교) */}
+      {showVerifyPasswordModal && pendingEntry && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
+            <h3 className="text-lg font-semibold text-slate-900 mb-1">학교 비밀번호 입력</h3>
+            <p className="text-sm text-slate-600 mb-4">
+              입장을 위해 학교 비밀번호 4자리를 입력하세요.
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">비밀번호 4자리</label>
+              <input
+                type="password"
+                inputMode="numeric"
+                maxLength={4}
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                onKeyDown={(e) => e.key === 'Enter' && handleVerifyPasswordConfirm()}
+                placeholder="0000"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            {passwordError && (
+              <p className="mt-2 text-sm text-red-600">{passwordError}</p>
+            )}
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => { setShowVerifyPasswordModal(false); setPendingEntry(null); setPasswordError(''); }}
+                className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50"
+              >
+                취소
+              </button>
+              <Button
+                variant="primary"
+                onClick={handleVerifyPasswordConfirm}
+                disabled={passwordLoading}
+                className="flex-1"
+              >
+                {passwordLoading ? '확인 중...' : '입장'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -1239,6 +1461,14 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
   const [showChecklistGuideModal, setShowChecklistGuideModal] = useState(false);
   const [checklistStorageCount, setChecklistStorageCount] = useState(null); // 모달에서 표시할 스토리지 체크리스트 개수
   
+  // 학교 비밀번호 변경 모달
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [changeCurrentPw, setChangeCurrentPw] = useState('');
+  const [changeNewPw, setChangeNewPw] = useState('');
+  const [changeNewPwConfirm, setChangeNewPwConfirm] = useState('');
+  const [changePwError, setChangePwError] = useState('');
+  const [changePwLoading, setChangePwLoading] = useState(false);
+  
   // 모달 열릴 때 스토리지 체크리스트 개수 조회
   useEffect(() => {
     if (!showChecklistGuideModal) return;
@@ -1552,6 +1782,30 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
     }
   };
   
+  const handleChangePasswordConfirm = async () => {
+    if (!/^\d{4}$/.test(changeCurrentPw) || !/^\d{4}$/.test(changeNewPw)) {
+      setChangePwError('비밀번호는 숫자 4자리여야 합니다.');
+      return;
+    }
+    if (changeNewPw !== changeNewPwConfirm) {
+      setChangePwError('새 비밀번호가 일치하지 않습니다.');
+      return;
+    }
+    setChangePwLoading(true);
+    setChangePwError('');
+    const result = await changeSchoolPassword(schoolCode, changeCurrentPw, changeNewPw);
+    setChangePwLoading(false);
+    if (result.success) {
+      setShowChangePasswordModal(false);
+      setChangeCurrentPw('');
+      setChangeNewPw('');
+      setChangeNewPwConfirm('');
+      setAlert({ type: 'success', message: '학교 비밀번호가 변경되었습니다.' });
+    } else {
+      setChangePwError(result.error || '변경에 실패했습니다.');
+    }
+  };
+  
   return (
     <div className="min-h-screen bg-slate-50">
       {/* 헤더 */}
@@ -1568,6 +1822,19 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
               <div>
                 <h1 className="text-lg font-semibold text-slate-900">{schoolName}</h1>
                 <p className="text-sm text-slate-500">수요조사 관리</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowChangePasswordModal(true);
+                    setChangeCurrentPw('');
+                    setChangeNewPw('');
+                    setChangeNewPwConfirm('');
+                    setChangePwError('');
+                  }}
+                  className="text-xs text-indigo-600 hover:text-indigo-700 mt-0.5"
+                >
+                  학교 비밀번호 변경
+                </button>
               </div>
             </div>
             {activeTab === 'survey' ? (
@@ -2261,6 +2528,82 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
                 }}
               >
                 확인
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 학교 비밀번호 변경 모달 */}
+      {showChangePasswordModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
+            <h3 className="text-lg font-semibold text-slate-900 mb-1">학교 비밀번호 변경</h3>
+            <p className="text-sm text-slate-600 mb-4">
+              현재 비밀번호를 입력한 뒤 새 비밀번호 4자리를 설정하세요.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">현재 비밀번호</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={changeCurrentPw}
+                  onChange={(e) => setChangeCurrentPw(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  placeholder="0000"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">새 비밀번호 4자리</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={changeNewPw}
+                  onChange={(e) => setChangeNewPw(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  placeholder="0000"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">새 비밀번호 확인</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={changeNewPwConfirm}
+                  onChange={(e) => setChangeNewPwConfirm(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  placeholder="0000"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+            {changePwError && (
+              <p className="mt-2 text-sm text-red-600">{changePwError}</p>
+            )}
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowChangePasswordModal(false);
+                  setChangeCurrentPw('');
+                  setChangeNewPw('');
+                  setChangeNewPwConfirm('');
+                  setChangePwError('');
+                }}
+                className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50"
+              >
+                취소
+              </button>
+              <Button
+                variant="primary"
+                onClick={handleChangePasswordConfirm}
+                disabled={changePwLoading}
+                className="flex-1"
+              >
+                {changePwLoading ? '변경 중...' : '변경'}
               </Button>
             </div>
           </div>

@@ -70,3 +70,10 @@ npm run build
 ## 4. 환경 변수 (필요한 경우)
 
 API 키 등을 코드에 넣지 않고 쓰려면 Netlify 대시보드에서 **Site settings** → **Environment variables** 에 추가하고, 코드에서는 `import.meta.env.VITE_NEIS_API_KEY` 등으로 읽도록 변경할 수 있습니다. 현재는 코드에 키가 있어 그대로 두어도 배포 가능합니다.
+
+### 학교 입장 비밀번호(4자리) 기능 사용 시
+
+- **SUPABASE_SERVICE_ROLE_KEY**: Supabase 프로젝트의 **Service role** 키 (비밀키).  
+  Netlify Function `school-password`에서 `school_passwords` 테이블을 읽고 쓸 때 사용합니다.  
+  **Site settings** → **Environment variables** 에 추가해 주세요.
+- Supabase SQL Editor에서 `sql/school_passwords.sql` 내용을 실행해 `school_passwords` 테이블을 생성해야 합니다.
