@@ -1710,34 +1710,65 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
   const [changePwError, setChangePwError] = useState('');
   const [changePwLoading, setChangePwLoading] = useState(false);
   
-  // 모달 열릴 때 스토리지 체크리스트 개수 조회 (5개 버킷 합산)
+  // 모달 열릴 때 스토리지 체크리스트 개수 조회 (5개 버킷, 하위폴더 포함 재귀 카운트)
+  const countFilesInFolder = async (bucket, path, offset = 0) => {
+    const limit = 1000;
+    const { data, error } = await supabase.storage.from(bucket).list(path, { limit, offset });
+    if (error || !Array.isArray(data)) return 0;
+    let count = 0;
+    for (const f of data) {
+      if (f.name.includes('.')) count += 1;
+      else count += await countFilesInFolder(bucket, path ? `${path}/${f.name}` : f.name);
+    }
+    if (data.length === limit) count += await countFilesInFolder(bucket, path, offset + data.length);
+    return count;
+  };
+
   useEffect(() => {
     if (!showChecklistGuideModal) return;
     setChecklistStorageCount(null);
     const fetchCount = async () => {
       let total = 0;
       for (const bucket of CHECKLIST_BUCKETS) {
-        const { data, error } = await supabase.storage.from(bucket).list('', { limit: 1000 });
-        if (!error && Array.isArray(data)) total += data.length;
+        total += await countFilesInFolder(bucket, '');
       }
       setChecklistStorageCount(total);
     };
     fetchCount();
   }, [showChecklistGuideModal]);
 
-  // 서식3 탭 활성 시 스토리지에 있는 체크리스트 연번 목록 로드 (5개 버킷 합산, 보유/미보유 표시용)
+  // 서식3 탭 활성 시 스토리지에 있는 체크리스트 연번 목록 로드 (5개 버킷, 하위폴더 재귀 + 다양한 파일명 형식 지원)
+  const parseSeqNoFromName = (name) => {
+    if (!name || typeof name !== 'string') return null;
+    const filename = name.includes('/') ? name.split('/').pop() : name;
+    const base = filename.split('.')[0];
+    const n = parseInt(base, 10);
+    if (Number.isInteger(n)) return n;
+    const match = base.match(/\d+/);
+    return match ? parseInt(match[0], 10) : null;
+  };
+
   useEffect(() => {
     if (activeTab !== 'form3') return;
     const loadChecklistSeqNos = async () => {
       const allSeqNos = new Set();
+      const listFolder = async (bucket, path, offset = 0) => {
+        const limit = 1000;
+        const { data, error } = await supabase.storage.from(bucket).list(path, { limit, offset });
+        if (error || !Array.isArray(data)) return;
+        for (const f of data) {
+          const n = parseSeqNoFromName(f.name);
+          if (n != null) allSeqNos.add(n);
+          const hasExt = f.name.includes('.');
+          if (!hasExt) {
+            const subPath = path ? `${path}/${f.name}` : f.name;
+            await listFolder(bucket, subPath);
+          }
+        }
+        if (data.length === limit) await listFolder(bucket, path, offset + data.length);
+      };
       for (const bucket of CHECKLIST_BUCKETS) {
-        const { data, error } = await supabase.storage.from(bucket).list('', { limit: 1000 });
-        if (error || !Array.isArray(data)) continue;
-        data.forEach(f => {
-          const base = f.name?.split('.')[0];
-          const n = parseInt(base, 10);
-          if (Number.isInteger(n)) allSeqNos.add(n);
-        });
+        await listFolder(bucket, '');
       }
       setChecklistFileSeqNos([...allSeqNos]);
     };
