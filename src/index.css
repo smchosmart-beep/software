@@ -3,6 +3,14 @@
 @tailwind utilities;
 
 /* 로고 등 투명 이미지가 흰 배경에서 잘 보이도록 */
-html, body {
-  background-color: #ffffff;
+html {
+  background-color: #fff;
+}
+body {
+  background-color: #fff;
+  min-height: 100vh;
+}
+#root {
+  background-color: #fff;
+  min-height: 100vh;
 }
