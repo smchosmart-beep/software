@@ -34,9 +34,9 @@ const CHECKLIST_BUCKET = 'checklists';
 // Supabase API 함수들
 // ============================================
 
-// 연번으로 체크리스트 파일 다운로드 (.hwpx 시도 후 .hwp 시도)
+// 연번으로 체크리스트 파일 다운로드 (hwpx → hwp → zip → pdf 순으로 시도)
 const downloadChecklistFile = async (seqNo) => {
-  for (const ext of ['hwpx', 'hwp']) {
+  for (const ext of ['hwpx', 'hwp', 'zip', 'pdf']) {
     const path = `${seqNo}.${ext}`;
     const { data, error } = await supabase.storage.from(CHECKLIST_BUCKET).download(path);
     if (!error && data) return { blob: data, ext };
@@ -56,7 +56,7 @@ const fetchEduzipProducts = async () => {
     return [];
   }
   
-  // criteria 배열로 변환 (seq_no: 연번 → 체크리스트 파일명 매핑용, 예: 1 → 1.hwp)
+  // criteria 배열로 변환 (seq_no: 연번 → 체크리스트 파일명 매핑용, 예: 1 → 1.hwp / 1.zip / 1.pdf)
   return data.map(item => ({
     id: item.id,
     seqNo: item.seq_no,
@@ -702,7 +702,6 @@ const MainPage = ({ onNavigate }) => {
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <p className="text-sm text-slate-500 mb-2">class1234.com</p>
           <a
             href="https://class1234.com"
             target="_blank"
@@ -1450,7 +1449,7 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
     }
   };
   
-  // 체크리스트 일괄 다운로드 (선정이유 작성된 제품만, .hwpx → .hwp 순으로 시도)
+  // 체크리스트 일괄 다운로드 (선정이유 작성된 제품만, .hwpx → .hwp → .zip → .pdf 순으로 시도)
   const handleDownloadChecklists = async () => {
     const productsWithReason = getUniqueProducts().filter(p => form3Data[p.productName]?.reason);
     if (productsWithReason.length === 0) {
@@ -2300,7 +2299,15 @@ export default function App() {
         {currentPage === 'main' && <MainPage onNavigate={handleNavigate} />}
       </div>
       <footer className="fixed bottom-0 left-0 right-0 py-3 px-4 text-center text-sm text-slate-500 border-t border-slate-200 bg-white z-10">
-        선생님들의 칼퇴근을 위해 무료로 배포합니다. -클래스페이-
+        <a
+          href="https://class1234.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200 font-medium"
+        >
+          class1234.com
+        </a>
+        {' '}선생님들의 칼퇴근을 위해 무료로 배포합니다. -클래스페이-
       </footer>
     </div>
   );
