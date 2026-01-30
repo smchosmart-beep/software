@@ -1682,6 +1682,8 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
   // [서식2] 에듀집 등록 체크리스트 안내 모달
   const [showChecklistGuideModal, setShowChecklistGuideModal] = useState(false);
   const [checklistStorageCount, setChecklistStorageCount] = useState(null); // 모달에서 표시할 스토리지 체크리스트 개수
+  // 서식3 의견서 작성: 연번별 체크리스트 파일 보유 여부 (스토리지 목록에서 추출)
+  const [checklistFileSeqNos, setChecklistFileSeqNos] = useState([]);
   
   // 학교 비밀번호 변경 모달
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
@@ -1701,7 +1703,26 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
     };
     fetchCount();
   }, [showChecklistGuideModal]);
-  
+
+  // 서식3 탭 활성 시 스토리지에 있는 체크리스트 연번 목록 로드 (보유/미보유 표시용)
+  useEffect(() => {
+    if (activeTab !== 'form3') return;
+    const loadChecklistSeqNos = async () => {
+      const { data, error } = await supabase.storage.from(CHECKLIST_BUCKET).list('', { limit: 1000 });
+      if (error || !Array.isArray(data)) {
+        setChecklistFileSeqNos([]);
+        return;
+      }
+      const seqNos = [...new Set(data.map(f => {
+        const base = f.name?.split('.')[0];
+        const n = parseInt(base, 10);
+        return Number.isInteger(n) ? n : null;
+      }).filter(Boolean))];
+      setChecklistFileSeqNos(seqNos);
+    };
+    loadChecklistSeqNos();
+  }, [activeTab]);
+
   // 데이터 로드
   useEffect(() => {
     const loadData = async () => {
@@ -2549,7 +2570,7 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
                 <p className="text-sm text-slate-500 mt-1">체크리스트는 웹하드에서 확인·관리합니다.</p>
               </div>
               <div className="p-8 text-center space-y-4">
-                <p className="text-slate-600">에듀집 등록 제품은 [서식3]에서 일괄 다운로드할 수 있고, 미등록 제품 체크리스트는 웹하드에서 확인할 수 있습니다.</p>
+                <p className="text-slate-600">에듀집 등록 제품은 [서식3] 의견서 작성 탭에서 일괄 다운로드할 수 있고, 미등록 제품 체크리스트는 웹하드에서 확인할 수 있습니다.</p>
                 <div className="flex flex-wrap items-center justify-center gap-3">
                   <a
                     href={FORM2_WEBHARD_URL}
@@ -2620,6 +2641,14 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
                                   <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded font-medium">○ 충족</span>
                                 ) : (
                                   <span className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded font-medium">X 미충족</span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-slate-500 text-sm">체크리스트 파일:</span>
+                                {checklistFileSeqNos.includes(eduzipData?.seqNo) ? (
+                                  <span className="text-xs px-2 py-1 bg-emerald-50 text-emerald-700 rounded font-medium">보유</span>
+                                ) : (
+                                  <span className="text-xs px-2 py-1 bg-amber-50 text-amber-700 rounded font-medium">미보유</span>
                                 )}
                               </div>
                             </div>
