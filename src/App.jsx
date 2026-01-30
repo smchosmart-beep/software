@@ -882,6 +882,7 @@ const TeacherPage = ({ schoolCode, schoolName, onBack }) => {
     purpose: '',
     hasPersonalInfo: '',
     isInEduzip: false,
+    selectedSeqNo: null, // 에듀집 제품 선택 시 연번(seq_no) 표시용
   });
   const [submissions, setSubmissions] = useState([]);
   const [alert, setAlert] = useState(null);
@@ -929,7 +930,8 @@ const TeacherPage = ({ schoolCode, schoolName, onBack }) => {
     setFormData(prev => ({ 
       ...prev, 
       productName: product.name,
-      isInEduzip: true 
+      isInEduzip: true,
+      selectedSeqNo: product.seqNo ?? null
     }));
     setProductSearch(product.name);
     setShowProductDropdown(false);
@@ -940,15 +942,16 @@ const TeacherPage = ({ schoolCode, schoolName, onBack }) => {
     setProductSearch(value);
     setShowProductDropdown(true);
     
-    // 에듀집 목록에 있는지 확인
-    const isInList = eduzipProducts.some(p => 
+    // 에듀집 목록에 있는지 확인 및 연번 매칭
+    const matched = eduzipProducts.find(p => 
       p.name.toLowerCase() === value.toLowerCase()
     );
     
     setFormData(prev => ({ 
       ...prev, 
       productName: value,
-      isInEduzip: isInList 
+      isInEduzip: !!matched,
+      selectedSeqNo: matched ? (matched.seqNo ?? null) : null
     }));
   };
   
@@ -989,6 +992,7 @@ const TeacherPage = ({ schoolCode, schoolName, onBack }) => {
         purpose: '',
         hasPersonalInfo: '',
         isInEduzip: false,
+        selectedSeqNo: null,
       });
       setProductSearch(''); // 제품 검색 초기화
       setAlert({ type: 'success', message: '수요조사가 제출되었습니다. 추가 제품을 신청하실 수 있습니다.' });
@@ -1071,7 +1075,9 @@ const TeacherPage = ({ schoolCode, schoolName, onBack }) => {
                       ? 'bg-green-100 text-green-700' 
                       : 'bg-amber-100 text-amber-700'
                   }`}>
-                    {formData.isInEduzip ? '에듀집 등록' : '미등록 제품'}
+                    {formData.isInEduzip
+                      ? (formData.selectedSeqNo != null ? `에듀집 등록 (연번: ${formData.selectedSeqNo})` : '에듀집 등록')
+                      : '미등록 제품'}
                   </span>
                 )}
               </div>
@@ -1217,6 +1223,7 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
     purpose: '',
     hasPersonalInfo: '',
     isInEduzip: false,
+    selectedSeqNo: null, // 에듀집 제품 선택 시 연번(seq_no) 표시용
   });
   const [productSearch, setProductSearch] = useState('');
   const [showProductDropdown, setShowProductDropdown] = useState(false);
@@ -1275,6 +1282,7 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
       ...prev, 
       productName: product.name,
       isInEduzip: true,
+      selectedSeqNo: product.seqNo ?? null,
       subject: '',
       purpose: ''
     }));
@@ -1293,14 +1301,15 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
     setProductSearch(value);
     setShowProductDropdown(true);
     
-    const isInList = eduzipProducts.some(p => 
+    const matched = eduzipProducts.find(p => 
       p.name.toLowerCase() === value.toLowerCase()
     );
     
     setAddFormData(prev => ({ 
       ...prev, 
       productName: value,
-      isInEduzip: isInList 
+      isInEduzip: !!matched,
+      selectedSeqNo: matched ? (matched.seqNo ?? null) : null
     }));
     
     // 타 학교 데이터 초기화
@@ -1346,6 +1355,7 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
         purpose: '',
         hasPersonalInfo: '',
         isInEduzip: false,
+        selectedSeqNo: null,
       }));
       setProductSearch('');
       setOtherSchoolData([]);
@@ -1762,7 +1772,9 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
                               ? 'bg-green-100 text-green-700' 
                               : 'bg-amber-100 text-amber-700'
                           }`}>
-                            {addFormData.isInEduzip ? '에듀집 등록' : '미등록'}
+                            {addFormData.isInEduzip
+                              ? (addFormData.selectedSeqNo != null ? `에듀집 등록 (연번: ${addFormData.selectedSeqNo})` : '에듀집 등록')
+                              : '미등록'}
                           </span>
                         )}
                       </div>
