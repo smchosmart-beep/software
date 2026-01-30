@@ -77,3 +77,4 @@ API 키 등을 코드에 넣지 않고 쓰려면 Netlify 대시보드에서 **Si
   Netlify Function `school-password`에서 `school_passwords` 테이블을 읽고 쓸 때 사용합니다.  
   **Site settings** → **Environment variables** 에 추가해 주세요.
 - Supabase SQL Editor에서 `sql/school_passwords.sql` 내용을 실행해 `school_passwords` 테이블을 생성해야 합니다.
+- 개인정보 수집·이용 동의 기록을 사용하려면 `sql/consent_log.sql` 내용을 실행해 `consent_log` 테이블을 생성해야 합니다.

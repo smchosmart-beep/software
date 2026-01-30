@@ -114,7 +114,24 @@ async function handlePost(event) {
     return withCors({ statusCode: 200, body: JSON.stringify({ valid }) });
   }
 
-  return withCors({ statusCode: 400, body: JSON.stringify({ error: 'action must be set or verify' }) });
+  if (action === 'reset') {
+    const adminName = body.admin_name;
+    const adminCode = (body.admin_code || '').toString().toLowerCase().replace(/\s/g, '');
+    if (adminName !== '클래스페이' || adminCode !== 'class1234.com') {
+      return withCors({ statusCode: 403, body: JSON.stringify({ success: false, error: '관리자 인증에 실패했습니다.' }) });
+    }
+    const supabase = getSupabase();
+    const password_hash = await bcrypt.hash('0000', 10);
+    const { error: upsertError } = await supabase
+      .from('school_passwords')
+      .upsert({ school_code: schoolCode, password_hash }, { onConflict: 'school_code' });
+    if (upsertError) {
+      return withCors({ statusCode: 500, body: JSON.stringify({ success: false, error: upsertError.message }) });
+    }
+    return withCors({ statusCode: 200, body: JSON.stringify({ success: true }) });
+  }
+
+  return withCors({ statusCode: 400, body: JSON.stringify({ error: 'action must be set, verify or reset' }) });
 }
 
 /** PUT: change password (body: school_code, current_password, new_password) */

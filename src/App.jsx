@@ -664,6 +664,54 @@ const changeSchoolPassword = async (schoolCode, currentPassword, newPassword) =>
   return { success: data.success !== false, error: data.error };
 };
 
+// 개인정보 수집·이용 동의 기록 (DB 저장)
+const saveConsent = async (schoolCode, role) => {
+  const res = await fetch('/.netlify/functions/consent', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ school_code: schoolCode.trim().toUpperCase(), role })
+  });
+  const data = await res.json();
+  return !!data.success;
+};
+
+const CONSENT_STORAGE_KEY = 'edutech_consent';
+
+function getConsentKey(schoolCode, role) {
+  return `${CONSENT_STORAGE_KEY}_${schoolCode}_${role}`;
+}
+
+function hasConsentInStorage(schoolCode, role) {
+  try {
+    return !!localStorage.getItem(getConsentKey(schoolCode, role));
+  } catch {
+    return false;
+  }
+}
+
+function setConsentInStorage(schoolCode, role) {
+  try {
+    localStorage.setItem(getConsentKey(schoolCode, role), new Date().toISOString());
+  } catch {}
+}
+
+// 시스템 관리자: 학교 비밀번호 0000으로 초기화
+const resetSchoolPasswordByAdmin = async (targetSchoolCode) => {
+  const res = await fetch('/.netlify/functions/school-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'reset',
+      school_code: targetSchoolCode.trim().toUpperCase(),
+      admin_name: '클래스페이',
+      admin_code: 'class1234.com'
+    })
+  });
+  const data = await res.json();
+  if (!res.ok) return { success: false, error: data.error || '초기화 실패' };
+  return { success: !!data.success, error: data.error };
+};
+
 const MainPage = ({ onNavigate }) => {
   const [schoolName, setSchoolName] = useState('');
   const [schoolCode, setSchoolCode] = useState('');
@@ -682,8 +730,12 @@ const MainPage = ({ onNavigate }) => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [passwordLoading, setPasswordLoading] = useState(false);
+  // 개인정보 수집·이용 동의 (최초 로그인 시)
+  const [showConsentModal, setShowConsentModal] = useState(false);
+  const [consentAgreed, setConsentAgreed] = useState(false);
+  const [consentLoading, setConsentLoading] = useState(false);
   
-  // 입장하기 (NEIS 검증 → 비밀번호 단계 → 페이지 이동)
+  // 입장하기 (시스템 관리자 / NEIS 검증 → 비밀번호 단계 → 동의 → 페이지 이동)
   const handleSubmit = async () => {
     if (!schoolName.trim()) {
       setError('학교명을 입력해주세요.');
@@ -691,6 +743,14 @@ const MainPage = ({ onNavigate }) => {
     }
     if (!schoolCode.trim()) {
       setError('NEIS 학교코드를 입력해주세요.');
+      return;
+    }
+    // 시스템 관리자 입장: 학교명 "클래스페이", 학교코드 "class1234.com"
+    const isAdminLogin =
+      schoolName.trim() === '클래스페이' &&
+      schoolCode.trim().toLowerCase().replace(/\s/g, '') === 'class1234.com';
+    if (isAdminLogin) {
+      onNavigate('admin');
       return;
     }
     if (!role) {
@@ -773,7 +833,13 @@ const MainPage = ({ onNavigate }) => {
     const result = await setSchoolPassword(pendingEntry.schoolCode, passwordInput, 'manager');
     setPasswordLoading(false);
     if (result.success) {
-      doNavigate();
+      if (hasConsentInStorage(pendingEntry.schoolCode, 'manager')) {
+        doNavigate();
+      } else {
+        setShowSetPasswordModal(false);
+        setShowConsentModal(true);
+        setConsentAgreed(false);
+      }
     } else {
       setPasswordError(result.error || '설정에 실패했습니다.');
     }
@@ -789,10 +855,36 @@ const MainPage = ({ onNavigate }) => {
     const result = await verifySchoolPassword(pendingEntry.schoolCode, passwordInput);
     setPasswordLoading(false);
     if (result.valid) {
-      doNavigate();
+      if (hasConsentInStorage(pendingEntry.schoolCode, role)) {
+        doNavigate();
+      } else {
+        setShowVerifyPasswordModal(false);
+        setShowConsentModal(true);
+        setConsentAgreed(false);
+      }
     } else {
       setPasswordError(result.error || '비밀번호가 일치하지 않습니다.');
     }
+  };
+
+  const handleConsentConfirm = async () => {
+    if (!consentAgreed) return;
+    setConsentLoading(true);
+    const ok = await saveConsent(pendingEntry.schoolCode, role);
+    setConsentLoading(false);
+    if (ok) {
+      setConsentInStorage(pendingEntry.schoolCode, role);
+      setShowConsentModal(false);
+      doNavigate();
+    } else {
+      setError('동의 기록 저장에 실패했습니다. 다시 시도해 주세요.');
+    }
+  };
+
+  const handleConsentReject = () => {
+    setShowConsentModal(false);
+    setPendingEntry(null);
+    setError('동의하지 않으면 서비스를 이용할 수 없습니다.');
   };
 
   const handleSearchCodeByName = async () => {
@@ -1087,6 +1179,136 @@ const MainPage = ({ onNavigate }) => {
           </div>
         </div>
       )}
+
+      {/* 개인정보 수집·이용 동의 모달 (최초 로그인 시) */}
+      {showConsentModal && pendingEntry && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] flex flex-col p-6">
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">개인정보 수집·이용 동의</h3>
+            <p className="text-sm text-slate-600 mb-4">
+              본 서비스 이용을 위해 아래 내용을 확인하고 동의해 주세요.
+            </p>
+            <div className="flex-1 min-h-0 overflow-y-auto border border-slate-200 rounded-lg p-4 mb-4 text-sm text-slate-700 leading-relaxed">
+              <p className="font-medium text-slate-900 mb-2">1. 수집하는 개인정보 항목</p>
+              <p className="mb-3">역할(일반교사/담당교사), 수요조사 입력 내용(신청교사명, 사용과목, 제품명, 주요 용도, 학생 개인정보 포함 여부 등)</p>
+              <p className="font-medium text-slate-900 mb-2">2. 개인정보의 수집·이용 목적</p>
+              <p className="mb-3">학습지원 소프트웨어 수요조사 및 심의자료 생성·관리</p>
+              <p className="font-medium text-slate-900 mb-2">3. 보유 및 이용 기간</p>
+              <p className="mb-3">매년 12월 30일 또는 각 학교 담당교사가 수요조사 자료 삭제 전 까지</p>
+              <p className="font-medium text-slate-900 mb-2">4. 동의 거부 권리</p>
+              <p>동의를 거부할 수 있으며, 거부 시 서비스 이용이 제한됩니다.</p>
+            </div>
+            <label className="flex items-start gap-2 mb-4 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={consentAgreed}
+                onChange={(e) => setConsentAgreed(e.target.checked)}
+                className="mt-1 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <span className="text-sm text-slate-700">위 내용을 확인했으며 동의합니다.</span>
+            </label>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handleConsentReject}
+                className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50"
+              >
+                동의하지 않음
+              </button>
+              <Button
+                variant="primary"
+                onClick={handleConsentConfirm}
+                disabled={!consentAgreed || consentLoading}
+                className="flex-1"
+              >
+                {consentLoading ? '처리 중...' : '동의하고 입장'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================
+// 페이지: 시스템 관리자 (비밀번호 0000 초기화)
+// ============================================
+
+const AdminPage = ({ onBack }) => {
+  const [targetSchoolCode, setTargetSchoolCode] = useState('');
+  const [message, setMessage] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleReset = async () => {
+    const code = targetSchoolCode.trim().toUpperCase();
+    if (!code) {
+      setMessage({ type: 'error', text: '초기화할 학교코드를 입력해주세요.' });
+      return;
+    }
+    if (code.length > 10) {
+      setMessage({ type: 'error', text: '학교코드는 10자 이내로 입력해주세요.' });
+      return;
+    }
+    setLoading(true);
+    setMessage(null);
+    const result = await resetSchoolPasswordByAdmin(code);
+    setLoading(false);
+    if (result.success) {
+      setMessage({ type: 'success', text: `해당 학교(${code}) 비밀번호가 0000으로 초기화되었습니다.` });
+      setTargetSchoolCode('');
+    } else {
+      setMessage({ type: 'error', text: result.error || '초기화에 실패했습니다.' });
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
+        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-4">
+          <button
+            onClick={onBack}
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5 text-slate-600" />
+          </button>
+          <h1 className="text-lg font-semibold text-slate-900">시스템 관리자</h1>
+        </div>
+      </header>
+      <main className="max-w-2xl mx-auto px-4 py-8">
+        <Card className="p-6">
+          <h2 className="text-xl font-semibold text-slate-900 mb-2">학교 비밀번호 초기화</h2>
+          <p className="text-sm text-slate-600 mb-6">
+            초기화할 학교의 NEIS 학교코드를 입력한 뒤, 비밀번호를 0000으로 설정합니다.
+          </p>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">학교코드</label>
+              <input
+                type="text"
+                value={targetSchoolCode}
+                onChange={(e) => setTargetSchoolCode(e.target.value.toUpperCase().slice(0, 10))}
+                placeholder="예: B123456789"
+                maxLength={10}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            {message && (
+              <div className={`p-3 rounded-lg text-sm ${message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+                {message.text}
+              </div>
+            )}
+            <Button
+              variant="primary"
+              onClick={handleReset}
+              disabled={loading}
+              className="w-full"
+            >
+              {loading ? '처리 중...' : '비밀번호 0000으로 초기화'}
+            </Button>
+          </div>
+        </Card>
+      </main>
     </div>
   );
 };
@@ -2639,6 +2861,7 @@ export default function App() {
       <div className="flex-1 min-h-0">
         {currentPage === 'teacher' && <TeacherPage schoolCode={schoolCode} schoolName={schoolName} onBack={handleBack} />}
         {currentPage === 'manager' && <ManagerPage schoolCode={schoolCode} schoolName={schoolName} onBack={handleBack} />}
+        {currentPage === 'admin' && <AdminPage onBack={handleBack} />}
         {currentPage === 'main' && <MainPage onNavigate={handleNavigate} />}
       </div>
       <footer className="fixed bottom-0 left-0 right-0 py-3 px-4 text-center text-sm text-slate-500 border-t border-slate-200 bg-white z-10">
