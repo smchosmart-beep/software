@@ -2697,7 +2697,7 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
                               </div>
                               <div className="flex items-center gap-2 mt-1">
                                 <span className="text-slate-500 text-sm">체크리스트 파일:</span>
-                                {checklistFileSeqNos.includes(eduzipData?.seqNo) ? (
+                                {eduzipData?.seqNo != null && checklistFileSeqNos.includes(Number(eduzipData.seqNo)) ? (
                                   <span className="text-xs px-2 py-1 bg-emerald-50 text-emerald-700 rounded font-medium">보유</span>
                                 ) : (
                                   <span className="text-xs px-2 py-1 bg-amber-50 text-amber-700 rounded font-medium">미보유</span>
