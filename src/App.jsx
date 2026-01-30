@@ -936,7 +936,7 @@ const MainPage = ({ onNavigate }) => {
             rel="noopener noreferrer"
             className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white mx-auto mb-4 cursor-pointer transition-transform duration-200 hover:scale-110 hover:shadow-md active:scale-95"
           >
-            <img src="/logo.png" alt="로고" className="w-16 h-16 object-contain pointer-events-none" />
+            <img src="/logo.png?v=2" alt="로고" className="w-16 h-16 object-contain pointer-events-none" />
           </a>
           <h1 className="text-2xl font-bold text-slate-900 mb-2">학습지원 소프트웨어</h1>
           <p className="text-slate-600 mb-4">수요조사 및 심의자료 생성 시스템</p>
