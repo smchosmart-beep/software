@@ -78,3 +78,10 @@ API 키 등을 코드에 넣지 않고 쓰려면 Netlify 대시보드에서 **Si
   **Site settings** → **Environment variables** 에 추가해 주세요.
 - Supabase SQL Editor에서 `sql/school_passwords.sql` 내용을 실행해 `school_passwords` 테이블을 생성해야 합니다.
 - 개인정보 수집·이용 동의 기록을 사용하려면 `sql/consent_log.sql` 내용을 실행해 `consent_log` 테이블을 생성해야 합니다.
+
+### 시스템 관리자 로그인 사용 시
+
+- **ADMIN_NAME**: 시스템 관리자 입장 시 사용하는 학교명(관리자 식별용). 예: `클래스페이`
+- **ADMIN_CODE**: 시스템 관리자 입장 시 사용하는 학교코드(관리자 식별용). 예: `class1234`  
+  위 두 값을 Netlify **Site settings** → **Environment variables** 에 추가해 주세요.  
+  관리자 여부는 서버(`admin-login`, `school-password` reset)에서만 검증하며, 클라이언트 코드에는 관리자 코드가 포함되지 않습니다.

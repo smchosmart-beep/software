@@ -695,16 +695,30 @@ function setConsentInStorage(schoolCode, role) {
   } catch {}
 }
 
-// 시스템 관리자: 학교 비밀번호 0000으로 초기화
-const resetSchoolPasswordByAdmin = async (targetSchoolCode) => {
+// 시스템 관리자 로그인 검증 (서버에서만 판별, 클라이언트에 관리자 코드 노출 안 함)
+const checkAdminLogin = async (schoolName, schoolCode) => {
+  const name = (schoolName || '').toString().trim();
+  const code = (schoolCode || '').toString().toLowerCase().replace(/\s/g, '');
+  if (!name || !code) return { ok: false };
+  const res = await fetch('/.netlify/functions/admin-login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ school_name: name, school_code: code })
+  });
+  const data = await res.json().catch(() => ({}));
+  return { ok: !!data.ok };
+};
+
+// 시스템 관리자: 학교 비밀번호 0000으로 초기화 (입장 시 입력한 관리자 정보를 body로 전달)
+const resetSchoolPasswordByAdmin = async (targetSchoolCode, adminName, adminCode) => {
   const res = await fetch('/.netlify/functions/school-password', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       action: 'reset',
       school_code: targetSchoolCode.trim().toUpperCase(),
-      admin_name: '클래스페이',
-      admin_code: 'class1234.com'
+      admin_name: (adminName || '').toString().trim(),
+      admin_code: (adminCode || '').toString().toLowerCase().replace(/\s/g, '')
     })
   });
   const data = await res.json();
@@ -745,12 +759,15 @@ const MainPage = ({ onNavigate }) => {
       setError('NEIS 학교코드를 입력해주세요.');
       return;
     }
-    // 시스템 관리자 입장: 학교명 "클래스페이", 학교코드 "class1234.com"
-    const isAdminLogin =
-      schoolName.trim() === '클래스페이' &&
-      schoolCode.trim().toLowerCase().replace(/\s/g, '') === 'class1234.com';
-    if (isAdminLogin) {
-      onNavigate('admin');
+    // 시스템 관리자 입장: 서버 API에서만 검증 (클라이언트에 관리자 코드 없음)
+    setIsLoading(true);
+    setError('');
+    const adminResult = await checkAdminLogin(schoolName, schoolCode);
+    setIsLoading(false);
+    if (adminResult.ok) {
+      const codeNorm = schoolCode.trim().toLowerCase().replace(/\s/g, '');
+      const nameTrim = schoolName.trim();
+      onNavigate('admin', codeNorm, nameTrim);
       return;
     }
     if (!role) {
@@ -1235,7 +1252,7 @@ const MainPage = ({ onNavigate }) => {
 // 페이지: 시스템 관리자 (비밀번호 0000 초기화)
 // ============================================
 
-const AdminPage = ({ onBack }) => {
+const AdminPage = ({ adminCredentials, onBack }) => {
   const [targetSchoolCode, setTargetSchoolCode] = useState('');
   const [message, setMessage] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -1250,9 +1267,13 @@ const AdminPage = ({ onBack }) => {
       setMessage({ type: 'error', text: '학교코드는 10자 이내로 입력해주세요.' });
       return;
     }
+    if (!adminCredentials?.schoolName || !adminCredentials?.schoolCode) {
+      setMessage({ type: 'error', text: '관리자 정보가 없습니다. 메인에서 다시 입장해 주세요.' });
+      return;
+    }
     setLoading(true);
     setMessage(null);
-    const result = await resetSchoolPasswordByAdmin(code);
+    const result = await resetSchoolPasswordByAdmin(code, adminCredentials.schoolName, adminCredentials.schoolCode);
     setLoading(false);
     if (result.success) {
       setMessage({ type: 'success', text: `해당 학교(${code}) 비밀번호가 0000으로 초기화되었습니다.` });
@@ -2872,25 +2893,34 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState('main');
   const [schoolCode, setSchoolCode] = useState('');
   const [schoolName, setSchoolName] = useState('');
-  
+  const [adminCredentials, setAdminCredentials] = useState(null); // 관리자 입장 시 입력한 값 (초기화 API용, 클라이언트에 관리자 코드 하드코딩 없음)
+
   const handleNavigate = (page, code = '', name = '') => {
     setCurrentPage(page);
-    setSchoolCode(code);
-    setSchoolName(name);
+    if (page === 'admin') {
+      setAdminCredentials({ schoolCode: code, schoolName: name });
+      setSchoolCode('');
+      setSchoolName('');
+    } else {
+      setAdminCredentials(null);
+      setSchoolCode(code);
+      setSchoolName(name);
+    }
   };
-  
+
   const handleBack = () => {
     setCurrentPage('main');
     setSchoolCode('');
     setSchoolName('');
+    setAdminCredentials(null);
   };
-  
+
   return (
     <div className="min-h-screen flex flex-col pb-14">
       <div className="flex-1 min-h-0">
         {currentPage === 'teacher' && <TeacherPage schoolCode={schoolCode} schoolName={schoolName} onBack={handleBack} />}
         {currentPage === 'manager' && <ManagerPage schoolCode={schoolCode} schoolName={schoolName} onBack={handleBack} />}
-        {currentPage === 'admin' && <AdminPage onBack={handleBack} />}
+        {currentPage === 'admin' && <AdminPage adminCredentials={adminCredentials} onBack={handleBack} />}
         {currentPage === 'main' && <MainPage onNavigate={handleNavigate} />}
       </div>
       <footer className="fixed bottom-0 left-0 right-0 py-3 px-4 text-center text-sm text-slate-500 border-t border-slate-200 bg-white z-10">

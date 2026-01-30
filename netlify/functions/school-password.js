@@ -115,9 +115,14 @@ async function handlePost(event) {
   }
 
   if (action === 'reset') {
-    const adminName = body.admin_name;
+    const expectedName = (process.env.ADMIN_NAME || '').trim();
+    const expectedCode = (process.env.ADMIN_CODE || '').toString().toLowerCase().replace(/\s/g, '');
+    if (!expectedName || !expectedCode) {
+      return withCors({ statusCode: 500, body: JSON.stringify({ success: false, error: '관리자 설정이 없습니다.' }) });
+    }
+    const adminName = (body.admin_name || '').toString().trim();
     const adminCode = (body.admin_code || '').toString().toLowerCase().replace(/\s/g, '');
-    if (adminName !== '클래스페이' || adminCode !== 'class1234.com') {
+    if (adminName !== expectedName || adminCode !== expectedCode) {
       return withCors({ statusCode: 403, body: JSON.stringify({ success: false, error: '관리자 인증에 실패했습니다.' }) });
     }
     const supabase = getSupabase();
