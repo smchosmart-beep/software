@@ -27,18 +27,22 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 // [서식2] 체크리스트 웹하드 링크
 const FORM2_WEBHARD_URL = 'https://works.do/xfWoVL3';
 
-// 체크리스트 파일 스토리지 버킷 (Supabase Storage)
-const CHECKLIST_BUCKET = 'checklists';
+// 체크리스트 파일 스토리지: 5개 버킷, 버킷당 100개 파일 (checklists_1: 1~100, checklists_2: 101~200, ...)
+const CHECKLIST_FILES_PER_BUCKET = 100;
+const CHECKLIST_BUCKET_COUNT = 5;
+const getChecklistBucketForSeqNo = (seqNo) => `checklists_${Math.ceil(Number(seqNo) / CHECKLIST_FILES_PER_BUCKET)}`;
+const CHECKLIST_BUCKETS = Array.from({ length: CHECKLIST_BUCKET_COUNT }, (_, i) => `checklists_${i + 1}`);
 
 // ============================================
 // Supabase API 함수들
 // ============================================
 
-// 연번으로 체크리스트 파일 다운로드 (hwpx → hwp → zip → pdf 순으로 시도)
+// 연번으로 체크리스트 파일 다운로드 (hwpx → hwp → zip → pdf 순으로 시도, 연번에 따라 버킷 자동 선택)
 const downloadChecklistFile = async (seqNo) => {
+  const bucket = getChecklistBucketForSeqNo(seqNo);
   for (const ext of ['hwpx', 'hwp', 'zip', 'pdf']) {
     const path = `${seqNo}.${ext}`;
-    const { data, error } = await supabase.storage.from(CHECKLIST_BUCKET).download(path);
+    const { data, error } = await supabase.storage.from(bucket).download(path);
     if (!error && data) return { blob: data, ext };
   }
   return null;
@@ -929,17 +933,9 @@ const MainPage = ({ onNavigate }) => {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md p-8">
-        <div className="text-center mb-8">
-          <a
-            href="https://class1234.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white mx-auto mb-4 cursor-pointer transition-transform duration-200 hover:scale-110 hover:shadow-md active:scale-95"
-          >
-            <img src="/logo.png?v=2" alt="로고" className="w-16 h-16 object-contain pointer-events-none" />
-          </a>
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">학습지원 소프트웨어</h1>
-          <p className="text-slate-600 mb-4">수요조사 및 심의자료 생성 시스템</p>
+        <div className="text-center pt-2 pb-6 mb-6 border-b border-slate-200">
+          <h1 className="text-2xl font-bold text-slate-900 mb-1.5">학습지원 소프트웨어</h1>
+          <p className="text-slate-600 text-sm mb-4">수요조사 및 심의자료 생성 시스템</p>
           <a
             href="/classpay"
             download="2026학년도 학습지원 소프트웨어 교육자료 선정 계획(안).hwp"
@@ -1714,32 +1710,36 @@ const ManagerPage = ({ schoolCode, schoolName, onBack }) => {
   const [changePwError, setChangePwError] = useState('');
   const [changePwLoading, setChangePwLoading] = useState(false);
   
-  // 모달 열릴 때 스토리지 체크리스트 개수 조회
+  // 모달 열릴 때 스토리지 체크리스트 개수 조회 (5개 버킷 합산)
   useEffect(() => {
     if (!showChecklistGuideModal) return;
     setChecklistStorageCount(null);
     const fetchCount = async () => {
-      const { data, error } = await supabase.storage.from(CHECKLIST_BUCKET).list('', { limit: 1000 });
-      if (!error && Array.isArray(data)) setChecklistStorageCount(data.length);
+      let total = 0;
+      for (const bucket of CHECKLIST_BUCKETS) {
+        const { data, error } = await supabase.storage.from(bucket).list('', { limit: 1000 });
+        if (!error && Array.isArray(data)) total += data.length;
+      }
+      setChecklistStorageCount(total);
     };
     fetchCount();
   }, [showChecklistGuideModal]);
 
-  // 서식3 탭 활성 시 스토리지에 있는 체크리스트 연번 목록 로드 (보유/미보유 표시용)
+  // 서식3 탭 활성 시 스토리지에 있는 체크리스트 연번 목록 로드 (5개 버킷 합산, 보유/미보유 표시용)
   useEffect(() => {
     if (activeTab !== 'form3') return;
     const loadChecklistSeqNos = async () => {
-      const { data, error } = await supabase.storage.from(CHECKLIST_BUCKET).list('', { limit: 1000 });
-      if (error || !Array.isArray(data)) {
-        setChecklistFileSeqNos([]);
-        return;
+      const allSeqNos = new Set();
+      for (const bucket of CHECKLIST_BUCKETS) {
+        const { data, error } = await supabase.storage.from(bucket).list('', { limit: 1000 });
+        if (error || !Array.isArray(data)) continue;
+        data.forEach(f => {
+          const base = f.name?.split('.')[0];
+          const n = parseInt(base, 10);
+          if (Number.isInteger(n)) allSeqNos.add(n);
+        });
       }
-      const seqNos = [...new Set(data.map(f => {
-        const base = f.name?.split('.')[0];
-        const n = parseInt(base, 10);
-        return Number.isInteger(n) ? n : null;
-      }).filter(Boolean))];
-      setChecklistFileSeqNos(seqNos);
+      setChecklistFileSeqNos([...allSeqNos]);
     };
     loadChecklistSeqNos();
   }, [activeTab]);
